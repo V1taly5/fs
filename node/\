@@ -1,0 +1,40 @@
+package node
+
+import (
+	"crypto/ed25519"
+	"net"
+	"sync"
+)
+
+type SharedKey struct {
+	LocalKey  []byte //exchLovalPrivKey
+	RemoteKey []byte
+	Secret    []byte
+}
+
+type Peer struct {
+	PubKey    ed25519.PublicKey
+	Conn      *net.Conn
+	Name      string
+	Peers     *Peers
+	SharedKey SharedKey
+}
+
+type Peers struct {
+	sync.RWMutex
+	peers map[string]*Peer
+}
+
+func NewPeer(conn net.Conn) *Peer{
+	return &Peer{
+		PubKey: nil,
+		Conn: &conn,
+		Name: conn.RemoteAddr().String(),
+		Peers: NewPeers(),
+		SharedKey: SharedKey{
+			RemoteKey: nil,
+			LocalKey: nil,
+			Secret: nil,
+		},
+	}
+}
