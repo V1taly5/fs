@@ -1,8 +1,9 @@
 package node
 
 import (
+	"bufio"
 	"encoding/binary"
-	"fmt"
+	"log"
 )
 
 type Cover struct {
@@ -65,12 +66,11 @@ func (c *Cover) Serialize() []byte {
 	return result
 }
 
-func Dederialize(b []byte) (cover *Cover) {
+func Deserialize(b []byte) (cover *Cover) {
 	messageLength := binary.BigEndian.Uint16(b[headerLen-2 : headerLen])
 	if messageLength > 65535 {
 		return nil
 	}
-	fmt.Println(b)
 	cover = &Cover{
 		Cmd:  b[0:cmdLen],
 		Id:   b[cmdLen : cmdLen+idLen],
@@ -91,4 +91,30 @@ func Dederialize(b []byte) (cover *Cover) {
 
 	return
 
+}
+
+func ReadCover(reader *bufio.Reader) (*Cover, error) {
+	header := make([]byte, headerLen)
+
+	_, err := reader.Read(header)
+
+	if err != nil {
+		return nil, err
+	}
+
+	cover := Deserialize(header)
+	_, err = reader.Read(cover.Message)
+	if err != nil {
+		return nil, err
+	}
+
+	return cover, nil
+}
+
+func (c Cover) Send(peer *Peer) {
+	log.Default().Printf("Send %s to peer %s ", c.Cmd, peer.Name)
+	_, err := (*peer.Conn).Write(c.Serialize())
+	if err != nil {
+		log.Default().Printf("ERROR on write message: %v", err)
+	}
 }

@@ -63,7 +63,7 @@ func TestCover_SerializeAndDeserialize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			serialized := tt.cover.Serialize()
 			fmt.Println(string(serialized))
-			deserialized := Dederialize(serialized)
+			deserialized := Deserialize(serialized)
 			fmt.Println(deserialized)
 
 			if tt.isValid {
