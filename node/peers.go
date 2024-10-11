@@ -2,6 +2,9 @@ package node
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"net"
 	"sync"
 )
@@ -16,6 +19,10 @@ type SharedKey struct {
 	LocalKey  []byte //exchLovalPrivKey
 	RemoteKey []byte
 	Secret    []byte
+}
+
+func (h HandShake) ToJson() []byte {
+	return toJson(h)
 }
 
 func (sk *SharedKey) Update(remoteKey []byte, localKey []byte) {
@@ -61,6 +68,38 @@ func NewPeers() *Peers {
 	}
 }
 
+func (p *Peer) UpdatePeer(cover *Cover) error {
+	if string(cover.Cmd) != "HAND" {
+		return errors.New("Invalid command")
+	}
+	handShake := &HandShake{}
+	err := json.Unmarshal(cover.Message, handShake)
+	if err != nil {
+		return err
+	}
+
+	pubKey, err := hex.DecodeString(handShake.PubKey)
+	if err != nil {
+		return err
+	}
+
+	// TODO: проверить подпись
+	isValid := ed25519.Verify(pubKey, cover.Message, cover.Sign)
+	if isValid {
+		ephemKey, err := hex.DecodeString(handShake.EphemKey)
+		if err != nil {
+			return err
+		}
+		p.Name = handShake.Name
+		p.PubKey = pubKey
+
+		p.SharedKey.Update(ephemKey, nil)
+		return nil
+	} else {
+		return errors.New("Invalid Sign verification")
+	}
+}
+
 func (p *Peers) Put(peer *Peer) {
 	p.Lock()
 	defer p.Unlock()
@@ -74,8 +113,8 @@ func (p *Peers) Get(key string) (peer *Peer, found bool) {
 	return nil, false
 }
 
-func (p *Peers) Remove(key string) {
+func (p *Peers) Remove(key *Peer) {
 	p.RLock()
 	defer p.RUnlock()
-	delete(p.peers, key)
+	delete(p.peers, string(key.PubKey))
 }
