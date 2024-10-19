@@ -1,15 +1,20 @@
 package node
 
-import "log"
+import (
+	"fs/internal/util/logger/sl"
+	"log/slog"
+)
 
 func (n Node) onHand(peer *Peer, cover *Cover) {
-	log.Default().Print("onHAND")
+	const op = "node.onHand"
+	log := n.log.With(slog.String("op", op))
+	log.Debug("onHAND")
 
 	newPeer := NewPeer(*peer.Conn)
 
 	err := newPeer.UpdatePeer(cover)
 	if err != nil {
-		log.Default().Printf("Update peer error: %s", err)
+		log.Debug("Update peer error", sl.Err(err))
 	} else {
 		if peer != nil {
 			n.UnregisterPeer(peer)
