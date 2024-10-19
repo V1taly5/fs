@@ -3,13 +3,17 @@ package listener
 import (
 	"bufio"
 	"fmt"
+	"fs/internal/util/logger/sl"
 	"fs/node"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 )
 
-func StartListener(node *node.Node, port int) {
+func StartListener(node *node.Node, port int, log *slog.Logger) {
+	const op = "listener.StartListener"
+	log = log.With(slog.String("op", op))
+
 	if port <= 0 || port > 65535 {
 		port = 35035
 	}
@@ -18,31 +22,37 @@ func StartListener(node *node.Node, port int) {
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
 	if err != nil {
-		log.Default().Printf("ResolveTCPAddr: %s", err.Error())
+		log.Info("ResolveTCPAddr", sl.Err(err))
 		os.Exit(1)
 	}
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		log.Default().Printf("ListenTCP: %s", err.Error())
+		log.Info("ListenTCP", sl.Err(err))
 		os.Exit(1)
 	}
-	fmt.Printf("\n\tService start on %s\n\n", tcpAddr.String())
+	log.Info("Service start on",
+		slog.String("TCPAddr", tcpAddr.String()),
+	)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			continue
 		}
-		go onConection(conn, node)
+		go onConection(conn, node, log)
 	}
 }
 
-func onConection(conn net.Conn, n *node.Node) {
+func onConection(conn net.Conn, n *node.Node, log *slog.Logger) {
+	const op = "listener.onConnection"
+	log = log.With(slog.String("op", op))
+
 	defer func() {
 		conn.Close()
 	}()
-
-	log.Default().Printf("New connection from: %v", conn.RemoteAddr().String())
+	log.Info("New connection from",
+		slog.String("RemoteAddr", conn.RemoteAddr().String()),
+	)
 
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
