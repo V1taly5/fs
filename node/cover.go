@@ -2,6 +2,7 @@ package node
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/binary"
 	"log"
 )
@@ -31,10 +32,11 @@ func NewCover(cmd string, message []byte) (cover *Cover) {
 
 	cover = &Cover{
 		Cmd:     []byte(cmd)[:cmdLen],
-		Id:      nil,
+		Id:      getRandomSeed(idLen)[:idLen],
 		From:    make([]byte, fromLen),
 		To:      make([]byte, toLen),
 		Sign:    make([]byte, signLen),
+		Length:  uint16(messageLength),
 		Message: message[0:messageLength],
 	}
 	return
@@ -82,13 +84,10 @@ func Deserialize(b []byte) (cover *Cover) {
 	}
 
 	if len(b) == (headerLen + int(messageLength)) {
-
 		cover.Message = b[headerLen:]
-
 	} else {
 		cover.Message = make([]byte, messageLength)
 	}
-
 	return
 
 }
@@ -107,7 +106,6 @@ func ReadCover(reader *bufio.Reader) (*Cover, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return cover, nil
 }
 
@@ -115,6 +113,17 @@ func (c Cover) Send(peer *Peer) {
 	log.Default().Printf("Send %s to peer %s ", c.Cmd, peer.Name)
 	_, err := (*peer.Conn).Write(c.Serialize())
 	if err != nil {
+		// TODO return error maybe custom
 		log.Default().Printf("ERROR on write message: %v", err)
 	}
+}
+
+func getRandomSeed(l int) []byte {
+	seed := make([]byte, l)
+	_, err := rand.Read(seed)
+	if err != nil {
+		// TODO return error
+		log.Printf("rand.Read Error: %v", err)
+	}
+	return seed
 }
