@@ -13,3 +13,11 @@
 
 # Игнорировать файл хронящий пиры
 peers.txt
+
+*:Zone.Identifier
+
+text.txt
+
+*.jpg
+
+*.env
