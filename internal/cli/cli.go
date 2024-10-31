@@ -2,8 +2,9 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"fs/node"
+	"fs/internal/node"
 	"os"
 	"strings"
 
@@ -26,8 +27,9 @@ func AttachCommand(cmd *cobra.Command) {
 	rootCmd.AddCommand(cmd)
 }
 
-func CliStart(args []string, ctx *AppContext) {
-	AttachCommand(createEchoCommand(ctx))
+func CliStart(ctx context.Context, args []string, appCtx *AppContext) {
+	AttachCommand(createEchoCommand(appCtx))
+	AttachCommand(createFileSendingCommand(appCtx))
 
 	if len(args) > 1 {
 		if err := Execute(); err != nil {
@@ -39,19 +41,26 @@ func CliStart(args []string, ctx *AppContext) {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Println("Введите команды для взаимодействия:")
 		for {
-			fmt.Print("> ")
-			input, _ := reader.ReadString('\n')
-			input = strings.TrimSpace(input)
+			select {
+			case <-ctx.Done():
+				// Завершение при отмене контекста
+				fmt.Println("CLI is shutting down gracefully.")
+				return
+			default:
+				fmt.Print("> ")
+				input, _ := reader.ReadString('\n')
+				input = strings.TrimSpace(input)
 
-			if input == "" {
-				continue
-			}
+				if input == "" {
+					continue
+				}
 
-			// Разделяем команду и аргументы
-			parts := strings.Split(input, " ")
-			os.Args = append([]string{os.Args[0]}, parts...)
-			if err := Execute(); err != nil {
-				fmt.Println(err)
+				// Разделяем команду и аргументы
+				parts := strings.Split(input, " ")
+				os.Args = append([]string{os.Args[0]}, parts...)
+				if err := Execute(); err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
 	}
