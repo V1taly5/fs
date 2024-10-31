@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"fs/internal/handlers"
+	handlers "fs/internal/cliHandlers"
 
 	"github.com/spf13/cobra"
 )
