@@ -3,10 +3,11 @@ package discover
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
+	"fs/internal/node"
 	"fs/internal/util/logger/sl"
-	"fs/node"
 	"log/slog"
 	"net"
 	"os"
@@ -15,19 +16,21 @@ import (
 
 var peers = make(map[string]string)
 
-func StartDiscover(n *node.Node, peersFile string, log *slog.Logger) {
+func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slog.Logger) {
 	const op = "discover.StartDiscover"
 	log = log.With(
 		slog.String("op", op),
 	)
-	go startMeow("224.0.0.1:35035", n, log)
-	go listenMeow("224.0.0.1:35035", n, log, connectToPeer)
+	go startMeow(ctx, "224.0.0.1:35035", n, log)
+	go listenMeow(ctx, "224.0.0.1:35035", n, log, connectToPeer)
 
 	file, err := os.Open(peersFile)
 	if err != nil {
 		log.Error("DISCOVER: Open peers.txt error", sl.Err(err))
 		return
 	}
+	defer file.Close()
+
 	var lastPeers []string
 
 	scanner := bufio.NewScanner(file)
@@ -39,11 +42,11 @@ func StartDiscover(n *node.Node, peersFile string, log *slog.Logger) {
 		slog.Int("len last Peers", len(lastPeers)),
 	)
 	for _, peerAddress := range lastPeers {
-		go connectToPeer(n, peerAddress, log)
+		go connectToPeer(ctx, n, peerAddress, log)
 	}
 }
 
-func connectToPeer(n *node.Node, peerAddress string, log *slog.Logger) {
+func connectToPeer(ctx context.Context, n *node.Node, peerAddress string, log *slog.Logger) {
 	const op = "discover.connectToPeer"
 	log = log.With(slog.String("op", op))
 
@@ -51,13 +54,13 @@ func connectToPeer(n *node.Node, peerAddress string, log *slog.Logger) {
 	// что вызывает при повторном подключении запись о том, что пир уже существует
 	// Это из-за ошибки чтения cover
 	if _, exist := peers[peerAddress]; exist {
-		log.Debug("peer already exist", slog.String("peer address", peerAddress))
+		log.Debug("Peer already exists", slog.String("peer address", peerAddress))
 		return
 	}
 
 	peers[peerAddress] = peerAddress
 
-	log.Debug("Try to connection peer", slog.String("peer address", peerAddress))
+	log.Debug("Attempting to connect to peer", slog.String("peer address", peerAddress))
 
 	conn, err := net.Dial("tcp", peerAddress)
 	if err != nil {
@@ -67,23 +70,19 @@ func connectToPeer(n *node.Node, peerAddress string, log *slog.Logger) {
 	defer conn.Close()
 
 	peer := handShake(n, conn, log)
-
 	if peer == nil {
-		log.Error("Fail on handshake")
+		log.Error("Handshake failed")
 		return
 	}
 
 	n.RegisterPeer(peer)
-
-	n.ListenPeer(peer)
-
+	n.ListenPeer(ctx, peer)
 	n.UnregisterPeer(peer)
-
 	delete(peers, peerAddress)
 }
 
 // Отправка UPD multicast пакетов с информацией о себе
-func startMeow(address string, n *node.Node, log *slog.Logger) {
+func startMeow(ctx context.Context, address string, n *node.Node, log *slog.Logger) {
 	const op = "discover.startMeow"
 	log = log.With(
 		slog.String("op", op),
@@ -99,15 +98,21 @@ func startMeow(address string, n *node.Node, log *slog.Logger) {
 		log.Error("DialUDP Error", sl.Err(err))
 	}
 	for {
-		_, err = conn.Write([]byte(fmt.Sprintf("meow:%v:%v", hex.EncodeToString(n.PubKey), n.Port)))
-		if err != nil {
-			log.Error("conn Write Error", sl.Err(err))
+		select {
+		case <-ctx.Done():
+			log.Info("Context canceled, stopping startMeow")
+			return
+		default:
+			_, err = conn.Write([]byte(fmt.Sprintf("meow:%v:%v", hex.EncodeToString(n.PubKey), n.Port)))
+			if err != nil {
+				log.Error("conn Write Error", sl.Err(err))
+			}
+			time.Sleep(1 * time.Second)
 		}
-		time.Sleep(1 * time.Second)
 	}
 }
 
-func listenMeow(address string, n *node.Node, log *slog.Logger, handler func(n *node.Node, peerAddress string, log *slog.Logger)) {
+func listenMeow(ctx context.Context, address string, n *node.Node, log *slog.Logger, handler func(ctx context.Context, n *node.Node, peerAddress string, log *slog.Logger)) {
 	const op = "discover.listenMeow"
 	log = log.With(slog.String("op", op))
 
@@ -120,6 +125,7 @@ func listenMeow(address string, n *node.Node, log *slog.Logger, handler func(n *
 	if err != nil {
 		log.Error("ListenMulticastUDP Error", sl.Err(err))
 	}
+	defer conn.Close()
 
 	err = conn.SetReadBuffer(1024)
 	if err != nil {
@@ -127,34 +133,39 @@ func listenMeow(address string, n *node.Node, log *slog.Logger, handler func(n *
 	}
 
 	for {
-		buffer := make([]byte, 1024)
-		_, src, err := conn.ReadFromUDP(buffer)
-		if err != nil {
-			log.Error("ReadFromUDP failed", sl.Err(err))
+		select {
+		case <-ctx.Done():
+			log.Info("Context canceled, stopping listenMeow")
+			return
+		default:
+			buffer := make([]byte, 1024)
+			_, src, err := conn.ReadFromUDP(buffer)
+			if err != nil {
+				log.Error("ReadFromUDP failed", sl.Err(err))
+				continue
+			}
+
+			trim := bytes.Trim(buffer, "\x00")
+			peerPubKeySrt := string(trim[5 : 5+64])
+			peerPubKey, err := hex.DecodeString(peerPubKeySrt)
+			if err != nil {
+				log.Error("DecodeHexString failed", sl.Err(err))
+				continue
+			}
+
+			_, found := n.Peers.Get(string(peerPubKey))
+			if found || bytes.Equal(n.PubKey, peerPubKey) {
+				continue
+			}
+
+			peerAddress := src.IP.String() + string(trim[5+64:])
+			handler(ctx, n, peerAddress, log)
 		}
-
-		trim := bytes.Trim(buffer, "\x00")
-
-		peerPubKeySrt := string(trim[5 : 5+64])
-		peerPubKey, err := hex.DecodeString(peerPubKeySrt)
-		if err != nil {
-			log.Error("DecodeHexString failed", sl.Err(err))
-			continue
-		}
-
-		_, found := n.Peers.Get(string(peerPubKey))
-		if found || bytes.Equal(n.PubKey, peerPubKey) {
-			continue
-		}
-
-		peerAddress := src.IP.String() + string(trim[5+64:])
-
-		handler(n, peerAddress, log)
 	}
 }
 
 func handShake(n *node.Node, conn net.Conn, log *slog.Logger) *node.Peer {
-	log.Info("DISCOVERY: try handshake with", slog.Any("Remote addr", conn.RemoteAddr()))
+	log.Info("DISCOVERY: attempting handshake with", slog.Any("Remote addr", conn.RemoteAddr()))
 	peer := node.NewPeer(conn)
 
 	n.SendName(peer)
@@ -166,7 +177,7 @@ func handShake(n *node.Node, conn net.Conn, log *slog.Logger) *node.Peer {
 	}
 	if string(cover.Cmd) == "HAND" {
 		if _, found := n.Peers.Get(string(cover.From)); found {
-			log.Info(" - - - - - - - - - - - - - - - --  -- - - - - Peer (%s) already exist", slog.String("Peer name", peer.Name))
+			log.Info("Peer already exists", slog.String("Peer name", peer.Name))
 			return nil
 		}
 	}
@@ -174,6 +185,7 @@ func handShake(n *node.Node, conn net.Conn, log *slog.Logger) *node.Peer {
 	err = peer.UpdatePeer(cover)
 	if err != nil {
 		log.Error("HandShake error", sl.Err(err))
+		return nil
 	}
 	return peer
 }
