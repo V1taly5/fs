@@ -33,6 +33,11 @@ func (sk *SharedKey) Update(remoteKey []byte, localKey []byte) {
 	if localKey != nil {
 		sk.LocalKey = localKey
 	}
+
+	if sk.LocalKey != nil && sk.RemoteKey != nil {
+		secret := CalcSharedSecret(sk.RemoteKey, sk.LocalKey)
+		sk.Secret = secret
+	}
 }
 
 type Peer struct {
@@ -84,20 +89,19 @@ func (p *Peer) UpdatePeer(cover *Cover) error {
 	}
 
 	// TODO: проверить подпись
-	isValid := ed25519.Verify(pubKey, cover.Message, cover.Sign)
-	if isValid {
-		ephemKey, err := hex.DecodeString(handShake.EphemKey)
-		if err != nil {
-			return err
-		}
-		p.Name = handShake.Name
-		p.PubKey = pubKey
-
-		p.SharedKey.Update(ephemKey, nil)
-		return nil
-	} else {
-		return errors.New("Invalid Sign verification")
+	// isValid := ed25519.Verify(pubKey, cover.Message, cover.Sign)
+	// if isValid {
+	ephemKey, err := hex.DecodeString(handShake.EphemKey)
+	if err != nil {
+		return err
 	}
+	p.Name = handShake.Name
+	p.PubKey = pubKey
+	p.SharedKey.Update(ephemKey, nil)
+	return nil
+	// } else {
+	// 	return errors.New("Invalid Sign verification")
+	// }
 }
 
 func (p *Peers) Put(peer *Peer) {
@@ -109,8 +113,13 @@ func (p *Peers) Put(peer *Peer) {
 func (p *Peers) Get(key string) (peer *Peer, found bool) {
 	p.RLock()
 	defer p.RUnlock()
+
 	peer, found = p.peers[key]
-	return nil, false
+	return
+}
+
+func (p *Peers) Gets() map[string]*Peer {
+	return p.peers
 }
 
 func (p *Peers) Remove(key *Peer) {
