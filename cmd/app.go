@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fs/discover"
 	"fs/internal/cli"
+	"fs/internal/config"
+	"fs/internal/discover"
+	"fs/internal/listener"
+	"fs/internal/node"
 	"fs/internal/util/logger/handlers/slogpretty"
-	"fs/listener"
-	"fs/node"
 	"log/slog"
 	"os"
 	"os/signal"
-	"os/user"
 	"syscall"
 )
 
@@ -20,83 +21,53 @@ const (
 	envProd  = "prod"
 )
 
-type InitParams struct {
-	Name      *string
-	Port      *int
-	PeersFile *string
-}
-
-var initParams InitParams
-
-func init() {
-	currentUser, _ := user.Current()
-	hostName, _ := os.Hostname()
-
-	initParams = InitParams{
-		Name:      flag.String("name", currentUser.Username+"@"+hostName, "name"),
-		Port:      flag.Int("port", 35034, "port that have to listen"),
-		PeersFile: flag.String("peers", "peers.txt", "Path to file with addresses on each line"),
-	}
-
-	flag.Parse()
-}
-
 func main() {
+	// Загружаем конфигурацию
+	cfg := config.MustLoad()
 
-	log := setupLogger(envLocal)
+	// Настраиваем логгер
+	log := setupLogger(cfg.Env)
 
 	log.Info("starting application",
-		slog.String("name", *initParams.Name),
-		slog.Int("port", *initParams.Port),
+		slog.String("name", cfg.Name),
+		slog.Int("port", cfg.Port),
 	)
 
-	signalChenal := make(chan os.Signal, 2)
-	signal.Notify(signalChenal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	// Создаем контекст с отменой для graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Создаем канал для перехвата сигналов ОС
+	signalChanel := make(chan os.Signal, 1)
+	signal.Notify(signalChanel, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
-		sig := <-signalChenal
-		log.Info("Exit by ",
-			slog.Any("signal", sig))
-		// log.Default().Printf("Exit by signal: %s", sig)
-		os.Exit(1)
+		sig := <-signalChanel
+		log.Info("Shutdown signal received", slog.Any("signal", sig))
+		cancel()
 	}()
 
-	n := node.NewNode(*initParams.Name, *initParams.Port, log)
+	n := node.NewNode(cfg.Name, cfg.Port, log)
 	cmdContext := cli.NewAppContext(n)
-	Start(n, log)
+
+	go listener.StartListener(ctx, n, cfg.Port, log)
+	go discover.StartDiscover(ctx, n, cfg.Peers, log)
+
 	remainingArgs := flag.Args()
-	// log.Default().Println(remainingArgs)
-	cli.CliStart(remainingArgs, cmdContext)
-	// CommandInput(n)
+	cli.CliStart(ctx, remainingArgs, cmdContext)
+
+	// Ждем завершения контекста, чтобы программа завершилась корректно
+	<-ctx.Done()
+	log.Info("Application shutting down gracefully")
 }
 
-func Start(n *node.Node, log *slog.Logger) {
+// func Start(n *node.Node, log *slog.Logger, cfg *config.Config) {
 
-	//var wg sync.WaitGroup
-	//wg.Add(1)
-	go listener.StartListener(n, *initParams.Port, log)
-	go discover.StartDiscover(n, *initParams.PeersFile, log)
-	//wg.Wait()
-}
-
-// func CommandInput(n *node.Node) {
-// 	reader := bufio.NewReader(os.Stdin)
-
-// 	for {
-// 		fmt.Print("Start command listener")
-// 		command, _ := reader.ReadString('\n')
-// 		command = strings.TrimSpace(command)
-// 		parts := strings.SplitN(command, "", 1)
-// 		if len(parts) != 1 || parts[0] != "send" {
-// 			fmt.Print("Неправильная команда")
-// 			continue
-// 		}
-// 		conn, err := net.Dial("tcp", "0.0.0.0:10002")
-// 		if err != nil {
-// 			// handle error
-// 		}
-// 		peer := node.NewPeer(conn)
-// 		n.SendName(peer)
-// 	}
+// 	//var wg sync.WaitGroup
+// 	//wg.Add(1)
+// 	go listener.StartListener(n, cfg.Port, log)
+// 	go discover.StartDiscover(n, cfg.Peers, log)
+// 	//wg.Wait()
 // }
 
 func setupLogger(env string) *slog.Logger {
