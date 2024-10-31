@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/binary"
+	"io"
 	"log"
 )
 
@@ -95,27 +96,35 @@ func Deserialize(b []byte) (cover *Cover) {
 func ReadCover(reader *bufio.Reader) (*Cover, error) {
 	header := make([]byte, headerLen)
 
-	_, err := reader.Read(header)
+	// Ошибка года
+	// _, err := reader.Read(header)
+	_, err := io.ReadFull(reader, header)
 
 	if err != nil {
 		return nil, err
 	}
 
 	cover := Deserialize(header)
-	_, err = reader.Read(cover.Message)
+
+	// Ошибка года 2
+	// _, err = reader.Read(cover.Message)
+	_, err = io.ReadFull(reader, cover.Message)
+
 	if err != nil {
 		return nil, err
 	}
 	return cover, nil
 }
 
-func (c Cover) Send(peer *Peer) {
+func (c Cover) Send(peer *Peer) error {
 	log.Default().Printf("Send %s to peer %s ", c.Cmd, peer.Name)
 	_, err := (*peer.Conn).Write(c.Serialize())
 	if err != nil {
 		// TODO return error maybe custom
 		log.Default().Printf("ERROR on write message: %v", err)
+		return err
 	}
+	return nil
 }
 
 func getRandomSeed(l int) []byte {
