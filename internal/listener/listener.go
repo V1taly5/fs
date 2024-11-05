@@ -9,6 +9,9 @@ import (
 	"log/slog"
 	"net"
 	"time"
+
+	"github.com/pion/transport/v3"
+	"github.com/pion/turn/v4"
 )
 
 func StartListener(ctx context.Context, node *node.Node, port int, log *slog.Logger) {
@@ -71,6 +74,70 @@ func StartListener(ctx context.Context, node *node.Node, port int, log *slog.Log
 	// 	}
 	// 	go onConection(conn, node, log)
 	// }
+}
+
+type relayConnection interface {
+	AcceptTCP() (net.PacketConn, error)
+}
+
+func StartListenerWithTURN(ctx context.Context, node *node.Node, client *turn.Client, log *slog.Logger) {
+	const op = "listener.StartListenerWithTURN"
+	log = log.With(slog.String("op", op))
+
+	relayConn, err := client.AllocateTCP()
+	if err != nil {
+		log.Error("Не удалось выделить ретранслируемое соединение: %v", err)
+	}
+	defer func() {
+		if closeErr := relayConn.Close(); closeErr != nil {
+		}
+	}()
+
+	log.Info("Сервис запущен через ретрансляцию TURN",
+		slog.String("RelayedAddr", relayConn.Addr().String()),
+	)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("Завершение работы слушателя через ретрансляцию")
+			return
+		default:
+			conn, err := relayConn.AcceptTCP()
+			if err != nil {
+				log.Error("Failed to accept TCP connection: %s", err)
+			}
+
+			go func() {
+				// Передаем relayConn как обычное соединение с пиром
+				// handleConnection(ctx, conn, node, log)
+				handleConnectionWithTURN(ctx, conn, node, log)
+			}()
+		}
+	}
+}
+
+func handleConnectionWithTURN(ctx context.Context, conn transport.TCPConn, n *node.Node, log *slog.Logger) {
+	const op = "listener.handleConnectionWithTURN"
+	log = log.With(slog.String("op", op))
+
+	defer func() {
+		conn.Close()
+		log.Info("Connection closed", slog.String("RemoteAddr", conn.RemoteAddr().String()))
+	}()
+
+	log.Info("New connection established",
+		slog.String("RemoteAddr", conn.RemoteAddr().String()),
+	)
+
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
+
+	readWriter := bufio.NewReadWriter(reader, writer)
+
+	// Здесь также можно использовать Peek или другие методы работы с буфером
+	peer := node.NewPeer(conn) // Используем conn как транспорт для node.Peer
+	n.HandleNode(ctx, readWriter, peer)
 }
 
 func handleConnection(ctx context.Context, conn net.Conn, n *node.Node, log *slog.Logger) {

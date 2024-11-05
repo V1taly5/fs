@@ -5,14 +5,16 @@ import (
 	"flag"
 	"fs/internal/cli"
 	"fs/internal/config"
-	"fs/internal/discover"
 	"fs/internal/listener"
 	"fs/internal/node"
 	"fs/internal/util/logger/handlers/slogpretty"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/pion/turn/v4"
 )
 
 const (
@@ -27,6 +29,43 @@ func main() {
 
 	// Настраиваем логгер
 	log := setupLogger(cfg.Env)
+
+	// Подключаемся к TURN-серверу
+	conn, err := net.Dial("tcp", "127.0.0.1:3478")
+	if err != nil {
+		log.Error("Не удалось подключиться к TURN-серверу: %v", err)
+	}
+	defer conn.Close()
+
+	client, err := turn.NewClient(&turn.ClientConfig{
+		STUNServerAddr: "127.0.0.1:3478",
+		TURNServerAddr: "127.0.0.1:3478",
+		Conn:           turn.NewSTUNConn(conn),
+		Username:       "username",
+		Password:       "password",
+		Realm:          "myrealm",
+		Software:       "MyClient",
+	})
+	if err != nil {
+		log.Error("Не удалось создать TURN-клиента: %v", err)
+	}
+	defer client.Close()
+
+	err = client.Listen()
+	if err != nil {
+		log.Error("Failed to listen: %s", err)
+	}
+
+	// Выделяем ретранслируемый сокет
+	// relayConn, err := client.AllocateTCP()
+	// if err != nil {
+	// 	log.Error("Не удалось выделить ретранслируемое соединение: %v", err)
+	// }
+	// defer relayConn.Close()
+
+	// Получаем ретранслируемый адрес
+	// relayedAddr := relayConn.Addr().String()
+	// log.Info("Ретранслируемый адрес:", relayedAddr)
 
 	log.Info("starting application",
 		slog.String("name", cfg.Name),
@@ -50,8 +89,9 @@ func main() {
 	n := node.NewNode(cfg.Name, cfg.Port, log)
 	cmdContext := cli.NewAppContext(n)
 
-	go listener.StartListener(ctx, n, cfg.Port, log)
-	go discover.StartDiscover(ctx, n, cfg.Peers, log)
+	// go listener.StartListener(ctx, n, cfg.Port, log)
+	go listener.StartListenerWithTURN(ctx, n, client, log)
+	// go discover.StartDiscover(ctx, n, cfg.Peers, log)
 
 	remainingArgs := flag.Args()
 	cli.CliStart(ctx, remainingArgs, cmdContext)
