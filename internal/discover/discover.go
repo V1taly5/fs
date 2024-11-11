@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var multicastAddress string = "224.0.0.251:35035"
+
 var peers = make(map[string]string)
 
 func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slog.Logger) {
@@ -21,8 +23,8 @@ func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slo
 	log = log.With(
 		slog.String("op", op),
 	)
-	go startMeow(ctx, "224.0.0.1:35035", n, log)
-	go listenMeow(ctx, "224.0.0.1:35035", n, log, connectToPeer)
+	go startMeow(ctx, multicastAddress, n, log)
+	go listenMeow(ctx, multicastAddress, n, log, connectToPeer)
 
 	file, err := os.Open(peersFile)
 	if err != nil {
