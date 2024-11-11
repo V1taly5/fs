@@ -48,10 +48,11 @@ func main() {
 	}()
 
 	n := node.NewNode(cfg.Name, cfg.Port, log)
-	cmdContext := cli.NewAppContext(n)
 
 	go listener.StartListener(ctx, n, cfg.Port, log)
-	go discover.StartDiscover(ctx, n, cfg.Peers, log)
+	discover := discover.StartDiscover(ctx, n, cfg.Peers, log)
+
+	cmdContext := cli.NewAppContext(n, discover)
 
 	remainingArgs := flag.Args()
 	cli.CliStart(ctx, remainingArgs, cmdContext)

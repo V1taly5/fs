@@ -11,25 +11,89 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"sync"
 	"time"
 )
+
+type Discoverer struct {
+	discoveredPeers map[string]string
+	mu              sync.Mutex
+	log             *slog.Logger
+}
+
+func (d *Discoverer) AddPeer(peerAddress string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if _, exists := d.discoveredPeers[peerAddress]; !exists {
+		d.discoveredPeers[peerAddress] = peerAddress
+	}
+}
+
+func (d *Discoverer) GetDiscoveredPeers() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	peers := make([]string, 0, len(d.discoveredPeers))
+	for _, peer := range d.discoveredPeers {
+		peers = append(peers, peer)
+	}
+	return peers
+}
+
+func (d *Discoverer) ConnectToPeer(ctx context.Context, n *node.Node, peerAddress string) {
+	const op = "discover.ConnectToPeer"
+	log := d.log.With(slog.String("op", op))
+
+	d.mu.Lock()
+	if _, exists := d.discoveredPeers[peerAddress]; !exists {
+		log.Debug("Peer not in discovered list", slog.String("peer address", peerAddress))
+		d.mu.Unlock()
+		return
+	}
+	// Опционально: можно удалить пира из списка после попытки подключения
+	// delete(d.discoveredPeers, peerAddress)
+	d.mu.Unlock()
+
+	// Остальной код из функции connectToPeer
+	conn, err := net.Dial("tcp", peerAddress)
+	if err != nil {
+		log.Error("Dial ERROR", sl.Err(err))
+		return
+	}
+	defer conn.Close()
+
+	peer := handShake(n, conn, log)
+	if peer == nil {
+		log.Error("Handshake failed")
+		return
+	}
+
+	n.RegisterPeer(peer)
+	n.ListenPeer(ctx, peer)
+	n.UnregisterPeer(peer)
+}
 
 var multicastAddress string = "224.0.0.251:35035"
 
 var peers = make(map[string]string)
 
-func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slog.Logger) {
+func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slog.Logger) *Discoverer {
 	const op = "discover.StartDiscover"
 	log = log.With(
 		slog.String("op", op),
 	)
+
+	discoverer := &Discoverer{
+		discoveredPeers: make(map[string]string),
+	}
 	go startMeow(ctx, multicastAddress, n, log)
-	go listenMeow(ctx, multicastAddress, n, log, connectToPeer)
+	go listenMeow(ctx, multicastAddress, n, log, discoverer)
 
 	file, err := os.Open(peersFile)
 	if err != nil {
 		log.Error("DISCOVER: Open peers.txt error", sl.Err(err))
-		return
+		return nil
 	}
 	defer file.Close()
 
@@ -43,9 +107,11 @@ func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slo
 	log.Info("DISCOVER: Start peer discovering. Last seen peers",
 		slog.Int("len last Peers", len(lastPeers)),
 	)
-	for _, peerAddress := range lastPeers {
-		go connectToPeer(ctx, n, peerAddress, log)
-	}
+
+	return discoverer
+	// for _, peerAddress := range lastPeers {
+	// 	go connectToPeer(ctx, n, peerAddress, log)
+	// }
 }
 
 func connectToPeer(ctx context.Context, n *node.Node, peerAddress string, log *slog.Logger) {
@@ -114,7 +180,7 @@ func startMeow(ctx context.Context, address string, n *node.Node, log *slog.Logg
 	}
 }
 
-func listenMeow(ctx context.Context, address string, n *node.Node, log *slog.Logger, handler func(ctx context.Context, n *node.Node, peerAddress string, log *slog.Logger)) {
+func listenMeow(ctx context.Context, address string, n *node.Node, log *slog.Logger, discoverer *Discoverer) {
 	const op = "discover.listenMeow"
 	log = log.With(slog.String("op", op))
 
@@ -161,7 +227,7 @@ func listenMeow(ctx context.Context, address string, n *node.Node, log *slog.Log
 			}
 
 			peerAddress := src.IP.String() + string(trim[5+64:])
-			handler(ctx, n, peerAddress, log)
+			discoverer.AddPeer(peerAddress)
 		}
 	}
 }

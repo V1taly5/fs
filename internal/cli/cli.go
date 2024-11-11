@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"fs/internal/discover"
 	"fs/internal/node"
 	"os"
 	"strings"
@@ -13,12 +14,14 @@ import (
 
 // AppContext хранит зависимости, которые будут использоваться в командах CLI
 type AppContext struct {
-	Node *node.Node
+	Node       *node.Node
+	Discoverer *discover.Discoverer
 }
 
-func NewAppContext(node *node.Node) *AppContext {
+func NewAppContext(node *node.Node, discover *discover.Discoverer) *AppContext {
 	return &AppContext{
-		Node: node,
+		Node:       node,
+		Discoverer: discover,
 	}
 }
 
@@ -30,6 +33,8 @@ func AttachCommand(cmd *cobra.Command) {
 func CliStart(ctx context.Context, args []string, appCtx *AppContext) {
 	AttachCommand(createEchoCommand(appCtx))
 	AttachCommand(createFileSendingCommand(appCtx))
+	AttachCommand(createListPeersCommand(appCtx))
+	AttachCommand(createConnectPeerCommand(appCtx))
 
 	if len(args) > 1 {
 		if err := Execute(); err != nil {
