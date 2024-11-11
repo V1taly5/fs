@@ -86,6 +86,7 @@ func StartDiscover(ctx context.Context, n *node.Node, peersFile string, log *slo
 
 	discoverer := &Discoverer{
 		discoveredPeers: make(map[string]string),
+		log:             log,
 	}
 	go startMeow(ctx, multicastAddress, n, log)
 	go listenMeow(ctx, multicastAddress, n, log, discoverer)
