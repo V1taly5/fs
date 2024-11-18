@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ed25519"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 )
 
@@ -115,7 +116,7 @@ func (n *Node) handleIndexExchange(peer *Peer, cover *Cover) {
 		log.Error("Failed to unmarshal index message", "error", err)
 		return
 	}
-
+	fmt.Println(indexMsg.Files)
 	// Сравниваем индексы и определяем недостающие блоки
 	n.compareIndexes(peer, indexMsg.Files)
 }

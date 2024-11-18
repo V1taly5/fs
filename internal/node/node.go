@@ -406,6 +406,7 @@ func (n *Node) compareIndexes(peer *Peer, remoteFiles []*FileIndex) {
 
 	// Список запросов на недостающие или измененные файлы/блоки
 	var missingBlocks []BlockRequest
+	fmt.Println("Пропущенные блоки ", missingBlocks)
 
 	// Сравниваем файлы из удаленного индекса
 	for path, remoteFi := range remoteIndexMap {
