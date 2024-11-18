@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 )
@@ -28,6 +29,9 @@ type Node struct {
 	handlers map[string]func(peer *Peer, cover *Cover)
 	Broker   chan *Cover
 
+	indexDB *IndexDB
+	watcher *FileWatcher
+
 	fileTransfers      map[string]*FileTransfer // Мапа для отслеживания передач файлов
 	fileTransfersMutex sync.Mutex               // Мьютекс для защиты доступа к fileTransfers
 }
@@ -35,6 +39,10 @@ type Node struct {
 func NewNode(name string, port int, log *slog.Logger) *Node {
 	publicKey, privateKey := LoadKey(name)
 
+	db, err := NewIndexDB("db")
+	if err != nil {
+		log.Error("db is not started")
+	}
 	node := &Node{
 		log:           log,
 		Port:          port,
@@ -44,12 +52,19 @@ func NewNode(name string, port int, log *slog.Logger) *Node {
 		PrivKey:       privateKey,
 		handlers:      make(map[string]func(peer *Peer, cover *Cover)),
 		fileTransfers: make(map[string]*FileTransfer, 0),
+		indexDB:       db,
 	}
 
 	node.handlers["HAND"] = node.onHand
 	node.handlers["MESS"] = node.onMess
 	node.handlers["FILE"] = node.HandleFileMessage
+	node.handlers[CmdIndexExchange] = node.handleIndexExchange
+	node.handlers[CmdBlockRequest] = node.handleBlockRequest
+	node.handlers[CmdBlockResponse] = node.handleBlockResponse
 
+	// node.handlers["META"] = node.handleMetadataRequest
+	// node.handlers["DATA"] = node.handleDataRequest
+	// node.handlers["NOTF"] = node.handleNotification
 	return node
 }
 
@@ -360,6 +375,151 @@ func assembleFile(fileName string, ft *FileTransfer) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (n *Node) compareIndexes(peer *Peer, remoteFiles []*FileIndex) {
+	const op = "node.compareIndexes"
+
+	log := n.log.With(slog.String("op", op))
+	// Получаем локальные индексы файлов
+
+	log.Debug("inside node.compareIndexes")
+	localFiles, err := n.indexDB.GetAllFileIndexes()
+	if err != nil {
+		log.Info("Failed to get local file indexes: ", sl.Err(err))
+		return
+	}
+
+	// Создаем мапы для быстрого доступа к индексам файлов по пути
+	localIndexMap := make(map[string]*FileIndex)
+	for _, fi := range localFiles {
+		localIndexMap[fi.Path] = fi
+	}
+
+	remoteIndexMap := make(map[string]*FileIndex)
+	for _, fi := range remoteFiles {
+		remoteIndexMap[fi.Path] = fi
+	}
+
+	// Список запросов на недостающие или измененные файлы/блоки
+	var missingBlocks []BlockRequest
+
+	// Сравниваем файлы из удаленного индекса
+	for path, remoteFi := range remoteIndexMap {
+		localFi, exists := localIndexMap[path]
+
+		if !exists {
+			// Файл отсутствует локально, запрашиваем все блоки
+			for _, block := range remoteFi.Blocks {
+				missingBlocks = append(missingBlocks, BlockRequest{
+					FilePath:   path,
+					BlockIndex: block.Index,
+				})
+			}
+		} else {
+			// Файл существует локально, сравниваем хеши
+			if localFi.FileHash != remoteFi.FileHash {
+				// Хеши файлов не совпадают, сравниваем блоки
+				remoteBlocksMap := make(map[int][32]byte)
+				for _, block := range remoteFi.Blocks {
+					remoteBlocksMap[block.Index] = block.Hash
+				}
+
+				localBlocksMap := make(map[int][32]byte)
+				for _, block := range localFi.Blocks {
+					localBlocksMap[block.Index] = block.Hash
+				}
+
+				// Определяем недостающие или измененные блоки
+				for index, remoteHash := range remoteBlocksMap {
+					localHash, exists := localBlocksMap[index]
+					if !exists || localHash != remoteHash {
+						// Блок отсутствует или изменен, добавляем в список запроса
+						missingBlocks = append(missingBlocks, BlockRequest{
+							FilePath:   path,
+							BlockIndex: index,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// Запрашиваем недостающие блоки у пира
+	if len(missingBlocks) > 0 {
+		n.requestMissingBlocks(peer, missingBlocks)
+	}
+}
+
+func (n *Node) readBlock(filePath string, blockIndex int) ([]byte, error) {
+	const BlockSize = 128 * 1024 // Размер блока: 128 КБ
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// Вычисляем смещение для чтения блока
+	offset := int64(blockIndex) * BlockSize
+
+	// Переходим к нужному месту в файле
+	_, err = file.Seek(offset, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
+	// Читаем блок данных
+	buf := make([]byte, BlockSize)
+	nRead, err := file.Read(buf)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	if nRead == 0 {
+		return nil, fmt.Errorf("no data read from file: %s at block index: %d", filePath, blockIndex)
+	}
+
+	return buf[:nRead], nil
+}
+
+func (n *Node) writeBlock(filePath string, blockIndex int, data []byte) error {
+	const BlockSize = 128 * 1024 // Размер блока: 128 КБ
+
+	// Убедимся, что директория для файла существует
+	dir := filepath.Dir(filePath)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+
+	// Открываем файл для чтения и записи, создаем, если не существует
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Вычисляем смещение для записи блока
+	offset := int64(blockIndex) * BlockSize
+
+	// Переходим к нужному месту в файле
+	_, err = file.Seek(offset, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	// Записываем данные блока
+	nWritten, err := file.Write(data)
+	if err != nil {
+		return err
+	}
+
+	if nWritten != len(data) {
+		return fmt.Errorf("written bytes %d does not match data length %d", nWritten, len(data))
 	}
 
 	return nil
