@@ -35,6 +35,7 @@ func CliStart(ctx context.Context, args []string, appCtx *AppContext) {
 	AttachCommand(createFileSendingCommand(appCtx))
 	AttachCommand(createListPeersCommand(appCtx))
 	AttachCommand(createConnectPeerCommand(appCtx))
+	AttachCommand(createIndexSendingCommand(appCtx))
 
 	if len(args) > 1 {
 		if err := Execute(); err != nil {

@@ -9,6 +9,7 @@ import (
 	"fs/internal/listener"
 	"fs/internal/node"
 	"fs/internal/util/logger/handlers/slogpretty"
+	"fs/internal/util/logger/sl"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -48,6 +49,11 @@ func main() {
 	}()
 
 	n := node.NewNode(cfg.Name, cfg.Port, log)
+
+	err := n.StartWatching("/home/vito/Source/projects/fs/testFolder")
+	if err != nil {
+		log.Error("Watcher err", sl.Err(err))
+	}
 
 	go listener.StartListener(ctx, n, cfg.Port, log)
 	discover := discover.StartDiscover(ctx, n, cfg.Peers, log)
