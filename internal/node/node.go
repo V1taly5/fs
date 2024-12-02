@@ -8,6 +8,9 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"fs/internal/cover"
+	"fs/internal/crypto"
+	"fs/internal/peers"
 	"fs/internal/util/logger/sl"
 	"io"
 	"log/slog"
@@ -23,11 +26,11 @@ type Node struct {
 	log      *slog.Logger
 	Port     int
 	Name     string
-	Peers    *Peers
+	Peers    *peers.Peers
 	PubKey   ed25519.PublicKey
 	PrivKey  ed25519.PrivateKey
-	handlers map[string]func(peer *Peer, cover *Cover)
-	Broker   chan *Cover
+	handlers map[string]func(peer *peers.Peer, cover *cover.Cover)
+	Broker   chan *cover.Cover
 
 	indexDB *IndexDB
 	watcher *FileWatcher
@@ -37,7 +40,7 @@ type Node struct {
 }
 
 func NewNode(name string, port int, log *slog.Logger) *Node {
-	publicKey, privateKey := LoadKey(name)
+	publicKey, privateKey := crypto.LoadKey(name)
 
 	db, err := NewIndexDB("db")
 	if err != nil {
@@ -47,10 +50,10 @@ func NewNode(name string, port int, log *slog.Logger) *Node {
 		log:           log,
 		Port:          port,
 		Name:          name,
-		Peers:         NewPeers(),
+		Peers:         peers.NewPeers(),
 		PubKey:        publicKey,
 		PrivKey:       privateKey,
-		handlers:      make(map[string]func(peer *Peer, cover *Cover)),
+		handlers:      make(map[string]func(peer *peers.Peer, cover *cover.Cover)),
 		fileTransfers: make(map[string]*FileTransfer, 0),
 		indexDB:       db,
 	}
@@ -69,13 +72,13 @@ func NewNode(name string, port int, log *slog.Logger) *Node {
 }
 
 // rename
-func (n *Node) SendName(peer *Peer) {
+func (n *Node) SendName(peer *peers.Peer) {
 	const op = "name.SendName"
 	log := n.log.With(slog.String("op", op))
 
-	ephemPubKey, epemPrivKey := CreatePairEphemeralKey()
+	ephemPubKey, epemPrivKey := crypto.CreatePairEphemeralKey()
 
-	handShake := HandShake{
+	handShake := peers.HandShake{
 		Name:     n.Name,
 		PubKey:   hex.EncodeToString(n.PubKey),
 		EphemKey: hex.EncodeToString(ephemPubKey.Bytes()),
@@ -87,11 +90,11 @@ func (n *Node) SendName(peer *Peer) {
 
 	sign := ed25519.Sign(n.PrivKey, handShake)
 
-	cover := NewSignedCover("HAND", n.PubKey, make([]byte, 32), sign, handShake)
+	cover := cover.NewSignedCover("HAND", n.PubKey, make([]byte, 32), sign, handShake)
 	cover.Send(peer)
 }
 
-func (n Node) SendMessage(peer *Peer, msg string) {
+func (n Node) SendMessage(peer *peers.Peer, msg string) {
 	const op = "node.SendMessage"
 	log := n.log.With(slog.String("op", op))
 
@@ -100,11 +103,11 @@ func (n Node) SendMessage(peer *Peer, msg string) {
 	}
 
 	//Encript message
-	cover := NewSignedCover("MESS", n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, []byte(msg)), []byte(msg))
+	cover := cover.NewSignedCover("MESS", n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, []byte(msg)), []byte(msg))
 	cover.Send(peer)
 }
 
-func (n *Node) UnregisterPeer(peer *Peer) {
+func (n *Node) UnregisterPeer(peer *peers.Peer) {
 	const op = "node.UnregisterPeer"
 	log := n.log.With(slog.String("op", op))
 
@@ -112,7 +115,7 @@ func (n *Node) UnregisterPeer(peer *Peer) {
 	log.Info("UnRegister peer", slog.String("peer name", peer.Name))
 }
 
-func (n *Node) RegisterPeer(peer *Peer) *Peer {
+func (n *Node) RegisterPeer(peer *peers.Peer) *peers.Peer {
 	const op = "node.RegisterPeer"
 	log := n.log.With(slog.String("op", op))
 
@@ -122,13 +125,13 @@ func (n *Node) RegisterPeer(peer *Peer) *Peer {
 
 	n.Peers.Put(peer)
 
-	log.Info("Register new peer", slog.Int(peer.Name, len(n.Peers.peers)))
+	log.Info("Register new peer", slog.Int(peer.Name, len(n.Peers.Peers)))
 
 	return peer
 }
 
 // ListenPeer Начало прослушивания соединения с пиром
-func (n Node) ListenPeer(ctx context.Context, peer *Peer) {
+func (n Node) ListenPeer(ctx context.Context, peer *peers.Peer) {
 	// ctx := context.Background()
 	readWriter := bufio.NewReadWriter(bufio.NewReader(*peer.Conn), bufio.NewWriter(*peer.Conn))
 	n.HandleNode(ctx, readWriter, peer)
@@ -217,7 +220,7 @@ func serializeFileChunk(fc *FileChunk) ([]byte, error) {
 }
 
 // Функция для отправки файла
-func (n Node) SendFile(peer *Peer, filePath string) {
+func (n Node) SendFile(peer *peers.Peer, filePath string) {
 	const op = "node.SendFile"
 	log := n.log.With("op", op)
 	// Открываем файл для чтения
@@ -276,7 +279,7 @@ func (n Node) SendFile(peer *Peer, filePath string) {
 
 		// Создаем Cover с командой "FILE" и отправляем его
 		// cover := NewCover("FILE", messageBytes)
-		cover := NewSignedCover("FILE", n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, messageBytes), messageBytes)
+		cover := cover.NewSignedCover("FILE", n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, messageBytes), messageBytes)
 		cover.Send(peer)
 
 		chunkNumber++
@@ -304,7 +307,7 @@ func deserializeFileChunk(data []byte) (*FileChunk, error) {
 }
 
 // Обработчик для приема кусков файла
-func (n *Node) HandleFileMessage(peer *Peer, cover *Cover) {
+func (n *Node) HandleFileMessage(peer *peers.Peer, cover *cover.Cover) {
 	// Десериализуем полученное сообщение в FileChunk
 	fileChunk, err := deserializeFileChunk(cover.Message)
 	if err != nil {
@@ -380,7 +383,7 @@ func assembleFile(fileName string, ft *FileTransfer) error {
 	return nil
 }
 
-func (n *Node) compareIndexes(peer *Peer, remoteFiles []*FileIndex) {
+func (n *Node) compareIndexes(peer *peers.Peer, remoteFiles []*FileIndex) {
 	const op = "node.compareIndexes"
 
 	log := n.log.With(slog.String("op", op))
@@ -526,7 +529,7 @@ func (n *Node) writeBlock(filePath string, blockIndex int, data []byte) error {
 	return nil
 }
 
-func (n *Node) HandleNode(ctx context.Context, rw *bufio.ReadWriter, peer *Peer) {
+func (n *Node) HandleNode(ctx context.Context, rw *bufio.ReadWriter, peer *peers.Peer) {
 	const op = "node.HandleNode"
 	log := n.log.With(slog.String("op", op))
 
@@ -545,7 +548,7 @@ func (n *Node) HandleNode(ctx context.Context, rw *bufio.ReadWriter, peer *Peer)
 			log.Info("Context canceeld, shutting down connection handler")
 			return
 		default:
-			cover, err := ReadCover(rw.Reader)
+			cover, err := cover.ReadCover(rw.Reader)
 			if err != nil {
 				if err != io.EOF {
 					log.Error("Error on read Cover", sl.Err(err))

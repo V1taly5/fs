@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"fs/internal/node"
+	"fs/internal/peers"
 	"fs/internal/util/logger/sl"
 	"log/slog"
 	"net"
@@ -98,6 +99,6 @@ func handleConnection(ctx context.Context, conn net.Conn, n *node.Node, log *slo
 	//		}
 	//		return
 	//	}
-	peer := node.NewPeer(conn)
+	peer := peers.NewPeer(conn)
 	n.HandleNode(ctx, readWriter, peer)
 }
