@@ -1,9 +1,10 @@
-package node
+package db
 
 import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"fs/internal/fileindex"
 	"sync"
 
 	"go.etcd.io/bbolt"
@@ -27,7 +28,7 @@ func (idb *IndexDB) Close() error {
 }
 
 // UpdateFileIndex сохраняет индекс файла в базу данных
-func (idb *IndexDB) UpdateFileIndex(fi *FileIndex) error {
+func (idb *IndexDB) UpdateFileIndex(fi *fileindex.FileIndex) error {
 	idb.mu.Lock()
 	defer idb.mu.Unlock()
 
@@ -57,11 +58,11 @@ func (idb *IndexDB) UpdateFileIndex(fi *FileIndex) error {
 }
 
 // GetFileIndex загружает индекс файла из базы данных по его пути
-func (idb *IndexDB) GetFileIndex(path string) (*FileIndex, error) {
+func (idb *IndexDB) GetFileIndex(path string) (*fileindex.FileIndex, error) {
 	idb.mu.RLock()
 	defer idb.mu.RUnlock()
 
-	var fi *FileIndex
+	var fi *fileindex.FileIndex
 
 	// Открываем транзакцию на чтение
 	err := idb.db.View(func(tx *bbolt.Tx) error {
@@ -79,7 +80,7 @@ func (idb *IndexDB) GetFileIndex(path string) (*FileIndex, error) {
 		// Десериализуем данные в FileIndex
 		buf := bytes.NewReader(data)
 		decoder := gob.NewDecoder(buf)
-		var index FileIndex
+		var index fileindex.FileIndex
 		if err := decoder.Decode(&index); err != nil {
 			return err
 		}
@@ -95,11 +96,11 @@ func (idb *IndexDB) GetFileIndex(path string) (*FileIndex, error) {
 }
 
 // GetAllFileIndexes возвращает все индексы файлов из базы данных
-func (idb *IndexDB) GetAllFileIndexes() ([]*FileIndex, error) {
+func (idb *IndexDB) GetAllFileIndexes() ([]*fileindex.FileIndex, error) {
 	idb.mu.RLock()
 	defer idb.mu.RUnlock()
 
-	var files []*FileIndex
+	var files []*fileindex.FileIndex
 
 	err := idb.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte("file_indexes"))
@@ -110,7 +111,7 @@ func (idb *IndexDB) GetAllFileIndexes() ([]*FileIndex, error) {
 		return bucket.ForEach(func(k, v []byte) error {
 			buf := bytes.NewReader(v)
 			decoder := gob.NewDecoder(buf)
-			var index FileIndex
+			var index fileindex.FileIndex
 			if err := decoder.Decode(&index); err != nil {
 				return err
 			}

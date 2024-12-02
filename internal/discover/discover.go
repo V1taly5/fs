@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"fs/internal/cover"
 	"fs/internal/node"
+	peer "fs/internal/peers"
 	"fs/internal/util/logger/sl"
 	"log/slog"
 	"net"
@@ -233,13 +235,13 @@ func listenMeow(ctx context.Context, address string, n *node.Node, log *slog.Log
 	}
 }
 
-func handShake(n *node.Node, conn net.Conn, log *slog.Logger) *node.Peer {
+func handShake(n *node.Node, conn net.Conn, log *slog.Logger) *peer.Peer {
 	log.Info("DISCOVERY: attempting handshake with", slog.Any("Remote addr", conn.RemoteAddr()))
-	peer := node.NewPeer(conn)
+	peer := peer.NewPeer(conn)
 
 	n.SendName(peer)
 
-	cover, err := node.ReadCover(bufio.NewReader(conn))
+	cover, err := cover.ReadCover(bufio.NewReader(conn))
 	if err != nil {
 		log.Error("Error on read Cover", sl.Err(err))
 		return nil

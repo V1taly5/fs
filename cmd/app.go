@@ -10,10 +10,12 @@ import (
 	"fs/internal/node"
 	"fs/internal/util/logger/handlers/slogpretty"
 	"fs/internal/util/logger/sl"
+	"fs/internal/watcher"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const (
@@ -47,10 +49,14 @@ func main() {
 		log.Info("Shutdown signal received", slog.Any("signal", sig))
 		cancel()
 	}()
-
+	debounceDuration := 500 * time.Millisecond
 	n := node.NewNode(cfg.Name, cfg.Port, log)
-
-	err := n.StartWatching("/home/vito/Source/projects/fs/testFolder")
+	watcher, err := watcher.NewFileWatcher(n.Indexer, debounceDuration)
+	if err != nil {
+		log.Error("Watcher err", sl.Err(err))
+	}
+	n.AddWathcer(watcher)
+	err = n.Watcher.StartWatching("/home/vito/Source/projects/fs/testFolder")
 	if err != nil {
 		log.Error("Watcher err", sl.Err(err))
 	}

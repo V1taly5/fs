@@ -1,12 +1,23 @@
-package node
+package cover
 
 import (
 	"bufio"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/binary"
+	"fs/internal/peers"
 	"io"
 	"log"
+	"net"
 )
+
+type PeerInterface interface {
+	GetPubKey() ed25519.PublicKey
+	GetConn() *net.Conn
+	GetName() string
+	GetSharedKey() peers.SharedKey
+	GetSharedSecret() []byte
+}
 
 type Cover struct {
 	Cmd     []byte
@@ -43,6 +54,41 @@ func NewCover(cmd string, message []byte) (cover *Cover) {
 	return
 }
 
+// GetCmd возвращает команду.
+func (c *Cover) GetCmd() string {
+	return string(c.Cmd)
+}
+
+// GetId возвращает идентификатор.
+func (c *Cover) GetId() []byte {
+	return c.Id
+}
+
+// GetFrom возвращает отправителя.
+func (c *Cover) GetFrom() []byte {
+	return c.From
+}
+
+// GetTo возвращает получателя.
+func (c *Cover) GetTo() []byte {
+	return c.To
+}
+
+// GetSign возвращает подпись.
+func (c *Cover) GetSign() []byte {
+	return c.Sign
+}
+
+// GetMessage возвращает сообщение.
+func (c *Cover) GetMessage() []byte {
+	return c.Message
+}
+
+// GetLength возвращает длину сообщения.
+func (c *Cover) GetLength() uint16 {
+	return c.Length
+}
+
 func NewSignedCover(cmd string, from []byte, to []byte, sign []byte, message []byte) (cover *Cover) {
 	cover = NewCover(cmd, message)
 	cover.From = from
@@ -71,9 +117,9 @@ func (c *Cover) Serialize() []byte {
 
 func Deserialize(b []byte) (cover *Cover) {
 	messageLength := binary.BigEndian.Uint16(b[headerLen-2 : headerLen])
-	if messageLength > 65535 {
-		return nil
-	}
+	// if messageLength > 65535 {
+	// 	return nil
+	// }
 	cover = &Cover{
 		Cmd:  b[0:cmdLen],
 		Id:   b[cmdLen : cmdLen+idLen],
@@ -116,9 +162,9 @@ func ReadCover(reader *bufio.Reader) (*Cover, error) {
 	return cover, nil
 }
 
-func (c Cover) Send(peer *Peer) error {
-	log.Default().Printf("Send %s to peer %s ", c.Cmd, peer.Name)
-	_, err := (*peer.Conn).Write(c.Serialize())
+func (c Cover) Send(peer PeerInterface) error {
+	log.Default().Printf("Send %s to peer %s ", c.Cmd, peer.GetName())
+	_, err := (*peer.GetConn()).Write(c.Serialize())
 	if err != nil {
 		// TODO return error maybe custom
 		log.Default().Printf("ERROR on write message: %v", err)

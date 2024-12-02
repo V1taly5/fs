@@ -4,6 +4,9 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	cover "fs/internal/cover"
+	"fs/internal/fileindex"
+	"fs/internal/peers"
 	"log/slog"
 )
 
@@ -14,7 +17,7 @@ const (
 )
 
 type IndexMessage struct {
-	Files []*FileIndex
+	Files []*fileindex.FileIndex
 }
 
 type BlockRequest struct {
@@ -28,9 +31,9 @@ type BlockResponse struct {
 	Data       []byte
 }
 
-func (n *Node) SendIndex(peer *Peer) error {
+func (n *Node) SendIndex(peer *peers.Peer) error {
 	// Получаем список файлов из базы данных
-	files, err := n.indexDB.GetAllFileIndexes()
+	files, err := n.Indexer.GetAllFileIndexes()
 	if err != nil {
 		return err
 	}
@@ -41,27 +44,28 @@ func (n *Node) SendIndex(peer *Peer) error {
 		return err
 	}
 
-	cover := NewSignedCover(CmdIndexExchange, n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, data), data)
+	cover := cover.NewSignedCover(CmdIndexExchange, n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, data), data)
 	// err = cover.Send(peer)
 	return cover.Send(peer)
 }
 
-func (n *Node) requestMissingBlocks(peer *Peer, missingBlocks []BlockRequest) error {
+func (n *Node) requestMissingBlocks(peer *peers.Peer, missingBlocks []BlockRequest) error {
 	for _, req := range missingBlocks {
 		data, err := json.Marshal(req)
 		if err != nil {
 			return err
 		}
-		cover := NewSignedCover(CmdBlockRequest, n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, data), data)
+		fmt.Println("Отправляем", CmdBlockRequest)
+		cover := cover.NewSignedCover(CmdBlockRequest, n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, data), data)
 		// cover := NewCover(CmdBlockRequest, data)
 		cover.Send(peer)
 	}
 	return nil
 }
 
-func (n *Node) handleBlockRequest(peer *Peer, cover *Cover) {
+func (n *Node) handleBlockRequest(peer *peers.Peer, Cover *cover.Cover) {
 	var req BlockRequest
-	err := json.Unmarshal(cover.Message, &req)
+	err := json.Unmarshal(Cover.Message, &req)
 	if err != nil {
 		n.log.Error("Failed to unmarshal block request", "error", err)
 		return
@@ -85,12 +89,12 @@ func (n *Node) handleBlockRequest(peer *Peer, cover *Cover) {
 		n.log.Error("Failed to marshal block response", "error", err)
 		return
 	}
-	responseCover := NewSignedCover(CmdBlockResponse, n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, data), data)
+	responseCover := cover.NewSignedCover(CmdBlockResponse, n.PubKey, peer.PubKey, ed25519.Sign(n.PrivKey, data), data)
 	// responseCover := NewCover(CmdBlockResponse, data)
 	responseCover.Send(peer)
 }
 
-func (n *Node) handleBlockResponse(peer *Peer, cover *Cover) {
+func (n *Node) handleBlockResponse(peer *peers.Peer, cover *cover.Cover) {
 	var resp BlockResponse
 	err := json.Unmarshal(cover.Message, &resp)
 	if err != nil {
@@ -106,7 +110,7 @@ func (n *Node) handleBlockResponse(peer *Peer, cover *Cover) {
 	}
 }
 
-func (n *Node) handleIndexExchange(peer *Peer, cover *Cover) {
+func (n *Node) handleIndexExchange(peer *peers.Peer, cover *cover.Cover) {
 	const op = "node.handleIndexExchange"
 	log := n.log.With(slog.String("op", op))
 	log.Debug("inside handleIndexExchange")
@@ -116,7 +120,7 @@ func (n *Node) handleIndexExchange(peer *Peer, cover *Cover) {
 		log.Error("Failed to unmarshal index message", "error", err)
 		return
 	}
-	fmt.Println(indexMsg.Files)
+	fmt.Println("прислынные индексы", indexMsg.Files)
 	// Сравниваем индексы и определяем недостающие блоки
 	n.compareIndexes(peer, indexMsg.Files)
 }

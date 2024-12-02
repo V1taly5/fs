@@ -1,16 +1,18 @@
 package node
 
 import (
+	cover "fs/internal/cover"
+	"fs/internal/peers"
 	"fs/internal/util/logger/sl"
 	"log/slog"
 )
 
-func (n Node) onHand(peer *Peer, cover *Cover) {
+func (n Node) onHand(peer *peers.Peer, cover *cover.Cover) {
 	const op = "node.onHand"
 	log := n.log.With(slog.String("op", op))
 	log.Debug("onHAND")
 
-	newPeer := NewPeer(*peer.Conn)
+	newPeer := peers.NewPeer(*peer.Conn)
 
 	err := newPeer.UpdatePeer(cover)
 	if err != nil {
@@ -30,7 +32,7 @@ func (n Node) onHand(peer *Peer, cover *Cover) {
 	return
 }
 
-func (n Node) onMess(peer *Peer, cover *Cover) {
+func (n Node) onMess(peer *peers.Peer, cover *cover.Cover) {
 	// cover.Message = Decrypt(cover.Message, peer.SharedKey.Secret)
 	n.Broker <- cover
 	return
