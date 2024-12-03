@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"fs/internal/indexer"
 	"log"
 	"strings"
 	"time"
@@ -18,9 +19,10 @@ type FileWatcher struct {
 	watcher *fsnotify.Watcher
 	events  chan FileEvent
 	errors  chan error
+	indexer *indexer.Indexer
 }
 
-func NewFileWatcher() (*FileWatcher, error) {
+func NewFileWatcher(idx *indexer.Indexer) (*FileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -30,6 +32,7 @@ func NewFileWatcher() (*FileWatcher, error) {
 		watcher: watcher,
 		events:  make(chan FileEvent),
 		errors:  make(chan error),
+		indexer: idx,
 	}
 
 	go fw.run()
@@ -69,29 +72,26 @@ func (fw *FileWatcher) run() {
 	}
 }
 
-func (n *Node) StartWatching(path string) error {
-	watcher, err := NewFileWatcher()
+func StartWatching(path string, db indexer.IndexDatabase) (*FileWatcher, error) {
+	idx := indexer.NewIndexer(db)
+	watcher, err := NewFileWatcher(idx)
+	err = watcher.Watch(path)
 	if err != nil {
-		return err
-	}
-	n.watcher = watcher
-	err = n.watcher.Watch(path)
-	if err != nil {
-		return err
+		return nil, err
 	}
 
-	go n.handleFileEvents()
+	go watcher.handleFileEvents()
 	fmt.Println("StartWatching...")
-	return nil
+	return watcher, nil
 }
 
-func (n *Node) handleFileEvents() {
+func (fw *FileWatcher) handleFileEvents() {
 	eventDebounce := make(map[string]*time.Timer)
 	debounceDuration := 500 * time.Millisecond // Настраиваемая задержка для дебаунсинга
 
 	for {
 		select {
-		case event := <-n.watcher.Events():
+		case event := <-fw.Events():
 			path := event.Path
 
 			// Игнорируем файлы с суффиксом ":Zone.Identifier"
@@ -112,13 +112,13 @@ func (n *Node) handleFileEvents() {
 			} else {
 				// Создаем новый таймер
 				timer := time.AfterFunc(debounceDuration, func() {
-					n.indexFile(path)
+					fw.indexer.IndexFile(path)
 					delete(eventDebounce, path)
 				})
 				eventDebounce[path] = timer
 			}
 
-		case err := <-n.watcher.Errors():
+		case err := <-fw.Errors():
 			log.Printf("Watcher error: %v", err)
 		}
 	}

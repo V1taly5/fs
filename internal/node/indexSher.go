@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"fs/internal/cover"
+	"fs/internal/indexer"
 	"fs/internal/peers"
 	"log/slog"
 )
@@ -16,7 +17,7 @@ const (
 )
 
 type IndexMessage struct {
-	Files []*FileIndex
+	Files []*indexer.FileIndex
 }
 
 type BlockRequest struct {
@@ -32,7 +33,7 @@ type BlockResponse struct {
 
 func (n *Node) SendIndex(peer *peers.Peer) error {
 	// Получаем список файлов из базы данных
-	files, err := n.indexDB.GetAllFileIndexes()
+	files, err := n.IndexDB.GetAllFileIndexes()
 	if err != nil {
 		return err
 	}

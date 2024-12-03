@@ -1,4 +1,4 @@
-package node
+package indexer
 
 import (
 	"crypto/sha256"
@@ -14,6 +14,24 @@ func init() {
 	gob.Register(BlockHash{})
 }
 
+// IndexDatabase определяет интерфейс для работы с индексами файлов.
+type IndexDatabase interface {
+	UpdateFileIndex(fi *FileIndex) error
+	GetFileIndex(path string) (*FileIndex, error)
+	GetAllFileIndexes() ([]*FileIndex, error)
+	Close() error
+}
+
+type Indexer struct {
+	indexDB IndexDatabase
+}
+
+func NewIndexer(db IndexDatabase) *Indexer {
+	return &Indexer{
+		indexDB: db,
+	}
+}
+
 type FileIndex struct {
 	Path     string
 	Size     int64
@@ -27,7 +45,7 @@ type BlockHash struct {
 	Hash  [32]byte // SHA-256 хеш блока
 }
 
-func (n *Node) indexFile(path string) {
+func (i *Indexer) IndexFile(path string) {
 	fileInfo, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		log.Printf("File does not exist: %s", path)
@@ -54,7 +72,7 @@ func (n *Node) indexFile(path string) {
 	fileIndex.FileHash = fileHash
 
 	// Обновляем индекс в базе данных
-	err = n.indexDB.UpdateFileIndex(fileIndex)
+	err = i.indexDB.UpdateFileIndex(fileIndex)
 	if err != nil {
 		log.Printf("Failed to update file index: %v", err)
 		return

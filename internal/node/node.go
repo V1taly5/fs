@@ -9,6 +9,7 @@ import (
 	"fs/internal/cover"
 	"fs/internal/crypto"
 	"fs/internal/db"
+	"fs/internal/indexer"
 	"fs/internal/peers"
 	"fs/internal/util/logger/sl"
 	"io"
@@ -31,8 +32,8 @@ type Node struct {
 	handlers map[string]func(peer *peers.Peer, cover *cover.Cover)
 	Broker   chan *cover.Cover
 
-	indexDB *db.IndexDB
-	watcher *FileWatcher
+	IndexDB *db.IndexDB
+	Watcher *FileWatcher
 
 	fileTransfers      map[string]*FileTransfer // Мапа для отслеживания передач файлов
 	fileTransfersMutex sync.Mutex               // Мьютекс для защиты доступа к fileTransfers
@@ -54,7 +55,7 @@ func NewNode(name string, port int, log *slog.Logger) *Node {
 		PrivKey:       privateKey,
 		handlers:      make(map[string]func(peer *peers.Peer, cover *cover.Cover)),
 		fileTransfers: make(map[string]*FileTransfer, 0),
-		indexDB:       db,
+		IndexDB:       db,
 	}
 
 	node.handlers["HAND"] = node.onHand
@@ -193,26 +194,26 @@ func (n Node) ListenPeer(ctx context.Context, peer *peers.Peer) {
 // 	}
 // }
 
-func (n *Node) compareIndexes(peer *peers.Peer, remoteFiles []*FileIndex) {
+func (n *Node) compareIndexes(peer *peers.Peer, remoteFiles []*indexer.FileIndex) {
 	const op = "node.compareIndexes"
 
 	log := n.log.With(slog.String("op", op))
 	// Получаем локальные индексы файлов
 
 	log.Debug("inside node.compareIndexes")
-	localFiles, err := n.indexDB.GetAllFileIndexes()
+	localFiles, err := n.IndexDB.GetAllFileIndexes()
 	if err != nil {
 		log.Info("Failed to get local file indexes: ", sl.Err(err))
 		return
 	}
 
 	// Создаем мапы для быстрого доступа к индексам файлов по пути
-	localIndexMap := make(map[string]*FileIndex)
+	localIndexMap := make(map[string]*indexer.FileIndex)
 	for _, fi := range localFiles {
 		localIndexMap[fi.Path] = fi
 	}
 
-	remoteIndexMap := make(map[string]*FileIndex)
+	remoteIndexMap := make(map[string]*indexer.FileIndex)
 	for _, fi := range remoteFiles {
 		remoteIndexMap[fi.Path] = fi
 	}

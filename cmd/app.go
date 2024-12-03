@@ -50,10 +50,11 @@ func main() {
 
 	n := node.NewNode(cfg.Name, cfg.Port, log)
 
-	err := n.StartWatching("/home/vito/Source/projects/fs/testFolder")
+	watcher, err := node.StartWatching("/home/vito/Source/projects/fs/testFolder", n.IndexDB)
 	if err != nil {
 		log.Error("Watcher err", sl.Err(err))
 	}
+	n.Watcher = watcher
 
 	go listener.StartListener(ctx, n, cfg.Port, log)
 	discover := discover.StartDiscover(ctx, n, cfg.Peers, log)
