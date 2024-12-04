@@ -3,12 +3,14 @@ package db
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
+	"errors"
 	"fs/internal/indexer"
 	"sync"
 
 	"go.etcd.io/bbolt"
 )
+
+var ErrFileIndexNotFound = errors.New("file index not found")
 
 type IndexDB struct {
 	db *bbolt.DB
@@ -68,13 +70,15 @@ func (idb *IndexDB) GetFileIndex(path string) (*indexer.FileIndex, error) {
 	err := idb.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte("file_indexes"))
 		if bucket == nil {
-			return fmt.Errorf("bucket not found")
+			return ErrFileIndexNotFound
+			// fmt.Errorf("bucket not found")
 		}
 
 		key := []byte(path)
 		data := bucket.Get(key)
 		if data == nil {
-			return fmt.Errorf("file index not found for path: %s", path)
+			return ErrFileIndexNotFound
+			// fmt.Errorf("file index not found for path: %s", path)
 		}
 
 		// Десериализуем данные в FileIndex

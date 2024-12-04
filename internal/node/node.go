@@ -12,6 +12,7 @@ import (
 	"fs/internal/indexer"
 	"fs/internal/peers"
 	"fs/internal/util/logger/sl"
+	"fs/internal/watcher"
 	"io"
 	"log/slog"
 	"os"
@@ -33,7 +34,7 @@ type Node struct {
 	Broker   chan *cover.Cover
 
 	IndexDB *db.IndexDB
-	Watcher *FileWatcher
+	Watcher *watcher.FileWatcher
 
 	fileTransfers      map[string]*FileTransfer // Мапа для отслеживания передач файлов
 	fileTransfersMutex sync.Mutex               // Мьютекс для защиты доступа к fileTransfers

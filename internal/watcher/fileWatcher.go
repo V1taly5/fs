@@ -1,4 +1,4 @@
-package node
+package watcher
 
 import (
 	"fmt"
@@ -75,6 +75,9 @@ func (fw *FileWatcher) run() {
 func StartWatching(path string, db indexer.IndexDatabase) (*FileWatcher, error) {
 	idx := indexer.NewIndexer(db)
 	watcher, err := NewFileWatcher(idx)
+	if err != nil {
+		return nil, err
+	}
 	err = watcher.Watch(path)
 	if err != nil {
 		return nil, err

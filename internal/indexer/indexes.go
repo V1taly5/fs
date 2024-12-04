@@ -81,6 +81,11 @@ func (i *Indexer) IndexFile(path string) {
 	log.Printf("Indexed file: %s", path)
 }
 
+func (i *Indexer) GetFileIndex(path string) (*FileIndex, error) {
+	fileIndex, err := i.indexDB.GetFileIndex(path)
+	return fileIndex, err
+}
+
 func hashFile(path string) ([]BlockHash, [32]byte, error) {
 	const BlockSize = 128 * 1024 // Размер блока: 128 КБ
 

@@ -10,6 +10,7 @@ import (
 	"fs/internal/node"
 	"fs/internal/util/logger/handlers/slogpretty"
 	"fs/internal/util/logger/sl"
+	"fs/internal/watcher"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -50,7 +51,7 @@ func main() {
 
 	n := node.NewNode(cfg.Name, cfg.Port, log)
 
-	watcher, err := node.StartWatching("/home/vito/Source/projects/fs/testFolder", n.IndexDB)
+	watcher, err := watcher.StartWatching("/home/vito/Source/projects/fs/testFolder", n.IndexDB)
 	if err != nil {
 		log.Error("Watcher err", sl.Err(err))
 	}
