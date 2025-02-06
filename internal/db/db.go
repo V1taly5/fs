@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"fs/internal/indexer"
 	"os"
 	"sync"
@@ -40,6 +41,19 @@ func NewIndexDB(cfg Config) (*IndexDB, error) {
 	db, err := bbolt.Open(cfg.Path, cfg.FileMode, cfg.Options)
 	if err != nil {
 		return nil, err
+	}
+
+	// Создаем bucket при инициализации
+	err = db.Update(func(tx *bbolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(FileIndexesBucket))
+		if err != nil {
+			return fmt.Errorf("failed to create bucket: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		db.Close() // Закрываем БД в случае ошибки
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	return &IndexDB{
