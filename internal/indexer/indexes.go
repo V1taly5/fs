@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -53,11 +54,13 @@ func (i *Indexer) IndexFile(path string) error {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
+		fmt.Println("[Error]: ", err)
 		return fmt.Errorf("failed to stat file: %w", err)
 	}
 
 	blocks, fileHash, err := i.hasher.HashFile(path)
 	if err != nil {
+		fmt.Println("[Error]: ", err)
 		return fmt.Errorf("failed to hash file: %w", err)
 	}
 
@@ -67,6 +70,7 @@ func (i *Indexer) IndexFile(path string) error {
 	// Получаем или создаем индекс файла
 	fi, err := i.getOrCreateFileIndex(path, fileInfo, blocks, fileHash)
 	if err != nil {
+		fmt.Println("[Error]: ", err)
 		return err
 	}
 	fmt.Println("Сохраненные блоки в бд: ", fi)
@@ -99,7 +103,8 @@ func (i *Indexer) createNewVersion(fileHash [32]byte, blocks []BlockHash) FileVe
 
 func (i *Indexer) getOrCreateFileIndex(path string, fileInfo os.FileInfo, blocks []BlockHash, fileHash [32]byte) (*FileIndex, error) {
 	existingIndex, err := i.indexDB.GetFileIndex(path)
-	if err != nil && err != ErrFileIndexNotFound {
+	fmt.Println(err)
+	if err != nil && !errors.Is(err, ErrFileIndexNotFound) {
 		return nil, fmt.Errorf("failed to get file index: %w", err)
 	}
 

@@ -93,7 +93,7 @@ func (idb *IndexDB) GetFileIndex(path string) (*indexer.FileIndex, error) {
 
 		data := bucket.Get([]byte(path))
 		if data == nil {
-			return ErrFileIndexNotFound
+			return indexer.ErrFileIndexNotFound
 		}
 
 		return idb.serializer.Deserialize(data, &fi)

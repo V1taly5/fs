@@ -128,6 +128,8 @@ func TestIndexDB_UpdateFileIndex(t *testing.T) {
 	}
 }
 
+// Тест сломался тк я использую ошибку из indexer ErrFileIndexNotFound в db.
+// Сделал так потомучто наоборот ловлю круговую зависимость, надо поправить.
 func TestIndexDB_GetFileIndex(t *testing.T) {
 	h := setupTest(t)
 
