@@ -44,6 +44,7 @@ func (n *Node) SendIndex(peer *peers.Peer) error {
 	}
 
 	indexMsg := IndexMessage{Files: files}
+	fmt.Println("indexMsg.Files: ", indexMsg.Files)
 	data, err := json.Marshal(indexMsg)
 	if err != nil {
 		return err
@@ -158,8 +159,10 @@ func (n *Node) handleIndexExchange(peer *peers.Peer, cover *cover.Cover) {
 	if err != nil {
 		log.Error("Failed to unmarshal index message", "error", err)
 		return
+
 	}
-	fmt.Println(indexMsg.Files)
+	fmt.Println("cover.Message: ", cover.Message)
+	fmt.Println("indexMsg.Files: ", indexMsg.Files)
 	// Сравниваем индексы и определяем недостающие блоки
 	n.compareIndexes(peer, indexMsg.Files)
 }
