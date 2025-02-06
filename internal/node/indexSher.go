@@ -44,7 +44,7 @@ func (n *Node) SendIndex(peer *peers.Peer) error {
 	}
 
 	indexMsg := IndexMessage{Files: files}
-	fmt.Println("indexMsg.Files: ", indexMsg.Files)
+	fmt.Println("files: ", files)
 	data, err := json.Marshal(indexMsg)
 	if err != nil {
 		return err
