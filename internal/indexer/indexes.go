@@ -232,15 +232,21 @@ func (i *Indexer) UpdateFileIndexAfterBlockWrite(filePath string, blockIndex int
 	i.mu.RLock()
 	fi, err := i.indexDB.GetFileIndex(filePath)
 	i.mu.RUnlock()
+
+	var blocks []BlockHash
 	if err != nil {
-		return fmt.Errorf("failed to get file index: %w", err)
+		if errors.Is(err, ErrFileIndexNotFound) {
+			blocks = make([]BlockHash, 0)
+		} else {
+			return fmt.Errorf("failed to get file index: %w", err)
+		}
+	} else {
+		blocks := make([]BlockHash, len(fi.Blocks))
+		copy(blocks, fi.Blocks)
 	}
 
 	// Update block in memory
 	updated := false
-	blocks := make([]BlockHash, len(fi.Blocks))
-	copy(blocks, fi.Blocks)
-
 	for idx := range blocks {
 		if blocks[idx].Index == blockIndex {
 			blocks[idx].Hash = blockHash
@@ -271,11 +277,28 @@ func (i *Indexer) UpdateFileIndexAfterBlockWrite(filePath string, blockIndex int
 	if err != nil {
 		return fmt.Errorf("failed to get file index: %w", err)
 	}
-
-	fi.Blocks = blocks
-	fi.FileHash = fileHash
-	fi.ModTime = time.Now()
-
+	if fi == nil {
+		fi = &FileIndex{
+			Path:     filePath,
+			ModTime:  time.Now(),
+			Blocks:   blocks,
+			FileHash: fileHash,
+			Versions: make([]FileVersion, 0),
+		}
+	} else {
+		// Получаем свежий индекс (мог измениться после RUnlock)
+		freshFi, err := i.indexDB.GetFileIndex(filePath)
+		if err != nil {
+			if err != ErrFileIndexNotFound {
+				return fmt.Errorf("failed to get fresh file index: %w", err)
+			}
+		} else {
+			fi = freshFi
+		}
+		fi.Blocks = blocks
+		fi.FileHash = fileHash
+		fi.ModTime = time.Now()
+	}
 	return i.indexDB.UpdateFileIndex(fi)
 }
 
