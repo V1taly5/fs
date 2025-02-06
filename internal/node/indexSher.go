@@ -8,6 +8,7 @@ import (
 	"fs/internal/cover"
 	"fs/internal/indexer"
 	"fs/internal/peers"
+	"fs/internal/util/logger/sl"
 	"log"
 	"log/slog"
 	"os"
@@ -142,7 +143,7 @@ func (n *Node) handleBlockResponse(peer *peers.Peer, cover *cover.Cover) {
 
 	fi, err := n.IndexDB.GetFileIndex(resp.FilePath)
 	if err != nil {
-		n.log.Error("Failed to get file index", "error", err)
+		n.log.Error("Failed to get file index", sl.Err(err))
 		return
 	}
 
