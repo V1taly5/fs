@@ -139,8 +139,10 @@ func (n *Node) handleBlockResponse(peer *peers.Peer, cover *cover.Cover) {
 	}
 
 	// Обновляем индекс фsайла
-	n.Indexer.UpdateFileIndexAfterBlockWrite(resp.FilePath, resp.BlockIndex, blockHash)
-
+	err = n.Indexer.UpdateFileIndexAfterBlockWrite(resp.FilePath, resp.BlockIndex, blockHash)
+	if err != nil {
+		n.log.Error("Failed to UpdateFileIndexAfterBlockWrite", sl.Err(err))
+	}
 	fi, err := n.IndexDB.GetFileIndex(resp.FilePath)
 	if err != nil {
 		n.log.Error("Failed to get file index", sl.Err(err))
