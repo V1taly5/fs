@@ -10,6 +10,8 @@ import (
 	"fs/internal/crypto"
 	"fs/internal/db"
 	"fs/internal/indexer"
+	"fs/internal/indexer/hasher"
+	"fs/internal/indexer/storage"
 	"fs/internal/peers"
 	"fs/internal/util/logger/sl"
 	"fs/internal/watcher"
@@ -33,19 +35,55 @@ type Node struct {
 	handlers map[string]func(peer *peers.Peer, cover *cover.Cover)
 	Broker   chan *cover.Cover
 
-	IndexDB *db.IndexDB
-	Watcher *watcher.FileWatcher
+	BlockStorage *storage.FileBlockStorage
+	IndexDB      *db.IndexDB
+	Indexer      *indexer.Indexer
+	Watcher      *watcher.FileWatcher
 
 	fileTransfers      map[string]*FileTransfer // Мапа для отслеживания передач файлов
 	fileTransfersMutex sync.Mutex               // Мьютекс для защиты доступа к fileTransfers
+
+	BlocksDir string // Директория для хранения блоков данных
 }
 
 func NewNode(name string, port int, log *slog.Logger) *Node {
 	publicKey, privateKey := crypto.LoadKey(name)
 
-	db, err := db.NewIndexDB("db")
+	// db init
+	dbCondig := db.Config{
+		Path:       "db",
+		FileMode:   0,
+		Options:    nil,
+		Serializer: nil,
+	}
+	db, err := db.NewIndexDB(dbCondig)
 	if err != nil {
 		log.Error("db is not started")
+	}
+
+	// blockStorage init
+	blocksDir := ".blocks"
+	blockStorage, err := storage.NewFileBlockStorage(blocksDir)
+	if err != nil {
+		log.Error("blockStorage is not init")
+	}
+
+	// hasher init
+	hasher := hasher.NewSHA256Hasher(indexer.DefaultBlockSize, blockStorage)
+
+	// indexer init
+	indexerConfig := indexer.IndexerConfig{
+		Database:     db,
+		BlockStorage: blockStorage,
+		Hasher:       hasher,
+		Logger:       nil,
+	}
+
+	indexer := indexer.NewIndexer(indexerConfig)
+
+	err = os.MkdirAll(blocksDir, 0755)
+	if err != nil {
+		fmt.Println(err)
 	}
 	node := &Node{
 		log:           log,
@@ -56,7 +94,11 @@ func NewNode(name string, port int, log *slog.Logger) *Node {
 		PrivKey:       privateKey,
 		handlers:      make(map[string]func(peer *peers.Peer, cover *cover.Cover)),
 		fileTransfers: make(map[string]*FileTransfer, 0),
-		IndexDB:       db,
+
+		IndexDB:      db,
+		Indexer:      indexer,
+		BlockStorage: blockStorage,
+		BlocksDir:    blocksDir,
 	}
 
 	node.handlers["HAND"] = node.onHand
@@ -202,11 +244,14 @@ func (n *Node) compareIndexes(peer *peers.Peer, remoteFiles []*indexer.FileIndex
 	// Получаем локальные индексы файлов
 
 	log.Debug("inside node.compareIndexes")
+	// log.Debug("remoteFiles:", remoteFiles)
+
 	localFiles, err := n.IndexDB.GetAllFileIndexes()
 	if err != nil {
 		log.Info("Failed to get local file indexes: ", sl.Err(err))
 		return
 	}
+	// log.Debug("localFiles:", localFiles)
 
 	// Создаем мапы для быстрого доступа к индексам файлов по пути
 	localIndexMap := make(map[string]*indexer.FileIndex)
@@ -221,53 +266,84 @@ func (n *Node) compareIndexes(peer *peers.Peer, remoteFiles []*indexer.FileIndex
 
 	// Список запросов на недостающие или измененные файлы/блоки
 	var missingBlocks []BlockRequest
-	fmt.Println("Пропущенные блоки ", missingBlocks)
 
 	// Сравниваем файлы из удаленного индекса
-	for path, remoteFi := range remoteIndexMap {
-		localFi, exists := localIndexMap[path]
+	for path, remoteFile := range remoteIndexMap {
+		localFile, exists := localIndexMap[path]
 
 		if !exists {
 			// Файл отсутствует локально, запрашиваем все блоки
-			for _, block := range remoteFi.Blocks {
+			for _, block := range remoteFile.Blocks {
 				missingBlocks = append(missingBlocks, BlockRequest{
 					FilePath:   path,
 					BlockIndex: block.Index,
 				})
 			}
 		} else {
-			// Файл существует локально, сравниваем хеши
-			if localFi.FileHash != remoteFi.FileHash {
-				// Хеши файлов не совпадают, сравниваем блоки
-				remoteBlocksMap := make(map[int][32]byte)
-				for _, block := range remoteFi.Blocks {
-					remoteBlocksMap[block.Index] = block.Hash
-				}
+			// // Файл существует локально, сравниваем хеши
+			// if localFile.FileHash != remoteFi.FileHash {
+			// 	// Хеши файлов не совпадают, сравниваем блоки
+			// 	remoteBlocksMap := make(map[int][32]byte)
+			// 	for _, block := range remoteFi.Blocks {
+			// 		remoteBlocksMap[block.Index] = block.Hash
+			// 	}
 
-				localBlocksMap := make(map[int][32]byte)
-				for _, block := range localFi.Blocks {
-					localBlocksMap[block.Index] = block.Hash
-				}
+			// 	localBlocksMap := make(map[int][32]byte)
+			// 	for _, block := range localFi.Blocks {
+			// 		localBlocksMap[block.Index] = block.Hash
+			// 	}
 
-				// Определяем недостающие или измененные блоки
-				for index, remoteHash := range remoteBlocksMap {
-					localHash, exists := localBlocksMap[index]
-					if !exists || localHash != remoteHash {
-						// Блок отсутствует или изменен, добавляем в список запроса
-						missingBlocks = append(missingBlocks, BlockRequest{
-							FilePath:   path,
-							BlockIndex: index,
-						})
-					}
+			// 	// Определяем недостающие или измененные блоки
+			// 	for index, remoteHash := range remoteBlocksMap {
+			// 		localHash, exists := localBlocksMap[index]
+			// 		if !exists || localHash != remoteHash {
+			// 			// Блок отсутствует или изменен, добавляем в список запроса
+			// 			missingBlocks = append(missingBlocks, BlockRequest{
+			// 				FilePath:   path,
+			// 				BlockIndex: index,
+			// 			})
+			// 		}
+			// 	}
+			// }
+
+			if localFile.FileHash != remoteFile.FileHash {
+				// Проверяем на конфликт
+				if localFile.LastSyncedVersionID != "" && localFile.Versions[len(localFile.Versions)-1].VersionID != localFile.LastSyncedVersionID {
+					// Конфликт
+					n.handleConflict(peer, localFile, remoteFile)
+				} else {
+					// Файл изменен на пиру, обновляем его локально
+					missing := compareBlocks(localFile, remoteFile)
+					missingBlocks = append(missingBlocks, missing...)
 				}
 			}
 		}
 	}
-
+	fmt.Println("Пропущенные блоки ", missingBlocks)
 	// Запрашиваем недостающие блоки у пира
 	if len(missingBlocks) > 0 {
 		n.requestMissingBlocks(peer, missingBlocks)
 	}
+}
+
+func compareBlocks(localFile *indexer.FileIndex, remoteFile *indexer.FileIndex) []BlockRequest {
+	localBlocks := make(map[int][32]byte)
+	for _, block := range localFile.Blocks {
+		localBlocks[block.Index] = block.Hash
+	}
+
+	var missingBlocks []BlockRequest
+	for _, remoteBlock := range remoteFile.Blocks {
+		localHash, exists := localBlocks[remoteBlock.Index]
+		if !exists || localHash != remoteBlock.Hash {
+			// Блок отсутствует локально или отличается
+			missingBlocks = append(missingBlocks, BlockRequest{
+				FilePath:   remoteFile.Path,
+				BlockIndex: remoteBlock.Index,
+			})
+		}
+	}
+	return missingBlocks
 }
 
 func (n *Node) readBlock(filePath string, blockIndex int) ([]byte, error) {

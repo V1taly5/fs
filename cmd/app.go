@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"fs/internal/cli"
 	"fs/internal/config"
 	"fs/internal/discover"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const (
@@ -51,9 +53,22 @@ func main() {
 
 	n := node.NewNode(cfg.Name, cfg.Port, log)
 
-	watcher, err := watcher.StartWatching("/home/vito/Source/projects/fs/testFolder", n.IndexDB)
+	watcherConfig := watcher.Config{
+		DebounceDuration: 500 * time.Millisecond,
+		IgnorePatterns:   []string{":Zone.Identifier", ".tmp"},
+		Logger:           nil,
+	}
+
+	watchPath := "/home/vito/Source/projects/fs/testFolder"
+	// watcher, err := watcher.StartWatching("/home/vito/Source/projects/fs/testFolder", n.IndexDB)
+	watcher, err := watcher.NewFileWatcher(n.Indexer, watcherConfig)
 	if err != nil {
 		log.Error("Watcher err", sl.Err(err))
+	}
+	err = watcher.Watch(watchPath)
+	if err != nil {
+		watcher.Close()
+		fmt.Errorf("failed to watch directory: %w", err)
 	}
 	n.Watcher = watcher
 

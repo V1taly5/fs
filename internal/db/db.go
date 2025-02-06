@@ -1,122 +1,126 @@
 package db
 
 import (
-	"bytes"
-	"encoding/gob"
-	"errors"
 	"fs/internal/indexer"
+	"os"
 	"sync"
 
 	"go.etcd.io/bbolt"
 )
 
-var ErrFileIndexNotFound = errors.New("file index not found")
+const (
+	FileIndexesBucket = "file_indexes"
+)
 
+// IndexDB представляет базу данных индексов файлов
 type IndexDB struct {
-	db *bbolt.DB
-	mu sync.RWMutex
+	db         *bbolt.DB
+	mu         sync.RWMutex
+	serializer Serializer
 }
 
-func NewIndexDB(path string) (*IndexDB, error) {
-	db, err := bbolt.Open(path, 0666, nil)
+// Config содержит конфигурацию для IndexDB
+type Config struct {
+	Path       string
+	FileMode   os.FileMode
+	Options    *bbolt.Options
+	Serializer Serializer
+}
+
+// NewIndexDB создает новый экземпляр IndexDB
+func NewIndexDB(cfg Config) (*IndexDB, error) {
+	if cfg.Serializer == nil {
+		cfg.Serializer = &GobSerializer{}
+	}
+
+	if cfg.FileMode == 0 {
+		cfg.FileMode = 0666
+	}
+
+	db, err := bbolt.Open(cfg.Path, cfg.FileMode, cfg.Options)
 	if err != nil {
 		return nil, err
 	}
-	return &IndexDB{db: db}, nil
+
+	return &IndexDB{
+		db:         db,
+		serializer: cfg.Serializer,
+	}, nil
 }
 
 func (idb *IndexDB) Close() error {
+	if idb.db == nil {
+		return ErrNilDB
+	}
 	return idb.db.Close()
 }
 
 // UpdateFileIndex сохраняет индекс файла в базу данных
 func (idb *IndexDB) UpdateFileIndex(fi *indexer.FileIndex) error {
+	if fi == nil {
+		return ErrNilFileIndex
+	}
+
+	data, err := idb.serializer.Serialize(fi)
+	if err != nil {
+		return err
+	}
+
 	idb.mu.Lock()
 	defer idb.mu.Unlock()
 
-	// Открываем транзакцию на запись
-	err := idb.db.Update(func(tx *bbolt.Tx) error {
-		// Получаем или создаем бакет для хранения индексов файлов
-		bucket, err := tx.CreateBucketIfNotExists([]byte("file_indexes"))
+	return idb.db.Update(func(tx *bbolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(FileIndexesBucket))
 		if err != nil {
 			return err
 		}
-
-		// Сериализуем FileIndex с помощью gob
-		var buf bytes.Buffer
-		encoder := gob.NewEncoder(&buf)
-		if err := encoder.Encode(fi); err != nil {
-			return err
-		}
-
-		// Используем путь файла как ключ
-		key := []byte(fi.Path)
-
-		// Сохраняем сериализованные данные в бакет
-		return bucket.Put(key, buf.Bytes())
+		return bucket.Put([]byte(fi.Path), data)
 	})
-
-	return err
 }
 
 // GetFileIndex загружает индекс файла из базы данных по его пути
 func (idb *IndexDB) GetFileIndex(path string) (*indexer.FileIndex, error) {
+	var fi indexer.FileIndex
+
 	idb.mu.RLock()
 	defer idb.mu.RUnlock()
 
-	var fi *indexer.FileIndex
-
-	// Открываем транзакцию на чтение
 	err := idb.db.View(func(tx *bbolt.Tx) error {
-		bucket := tx.Bucket([]byte("file_indexes"))
+		bucket := tx.Bucket([]byte(FileIndexesBucket))
 		if bucket == nil {
-			return ErrFileIndexNotFound
-			// fmt.Errorf("bucket not found")
+			return ErrBucketNotFound
 		}
 
-		key := []byte(path)
-		data := bucket.Get(key)
+		data := bucket.Get([]byte(path))
 		if data == nil {
 			return ErrFileIndexNotFound
-			// fmt.Errorf("file index not found for path: %s", path)
 		}
 
-		// Десериализуем данные в FileIndex
-		buf := bytes.NewReader(data)
-		decoder := gob.NewDecoder(buf)
-		var index indexer.FileIndex
-		if err := decoder.Decode(&index); err != nil {
-			return err
-		}
-		fi = &index
-		return nil
+		return idb.serializer.Deserialize(data, &fi)
 	})
 
 	if err != nil {
 		return nil, err
 	}
-
-	return fi, nil
+	return &fi, nil
 }
 
 // GetAllFileIndexes возвращает все индексы файлов из базы данных
 func (idb *IndexDB) GetAllFileIndexes() ([]*indexer.FileIndex, error) {
+	var files []*indexer.FileIndex
+
 	idb.mu.RLock()
 	defer idb.mu.RUnlock()
 
-	var files []*indexer.FileIndex
-
 	err := idb.db.View(func(tx *bbolt.Tx) error {
-		bucket := tx.Bucket([]byte("file_indexes"))
+		bucket := tx.Bucket([]byte(FileIndexesBucket))
 		if bucket == nil {
-			return nil // Нет индексов
+			return nil
 		}
 
 		return bucket.ForEach(func(k, v []byte) error {
-			buf := bytes.NewReader(v)
-			decoder := gob.NewDecoder(buf)
 			var index indexer.FileIndex
-			if err := decoder.Decode(&index); err != nil {
+			if err := idb.serializer.Deserialize(v, &index); err != nil {
 				return err
 			}
 			files = append(files, &index)
@@ -127,6 +131,19 @@ func (idb *IndexDB) GetAllFileIndexes() ([]*indexer.FileIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return files, nil
+}
+
+// DeleteFileIndex удаляет индекс файла из базы данных
+func (idb *IndexDB) DeleteFileIndex(path string) error {
+	idb.mu.Lock()
+	defer idb.mu.Unlock()
+
+	return idb.db.Update(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(FileIndexesBucket))
+		if bucket == nil {
+			return nil
+		}
+		return bucket.Delete([]byte(path))
+	})
 }

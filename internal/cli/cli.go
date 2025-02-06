@@ -4,26 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"fs/internal/discover"
-	"fs/internal/node"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 )
-
-// AppContext хранит зависимости, которые будут использоваться в командах CLI
-type AppContext struct {
-	Node       *node.Node
-	Discoverer *discover.Discoverer
-}
-
-func NewAppContext(node *node.Node, discover *discover.Discoverer) *AppContext {
-	return &AppContext{
-		Node:       node,
-		Discoverer: discover,
-	}
-}
 
 // AttachCommand добавляет команды к корневой команде
 func AttachCommand(cmd *cobra.Command) {
