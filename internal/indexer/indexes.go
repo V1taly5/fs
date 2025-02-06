@@ -69,6 +69,7 @@ func (i *Indexer) IndexFile(path string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Сохраненные блоки в бд: ", fi)
 
 	// Добавляем новую версию
 	fi = i.addNewVersion(fi, version)
