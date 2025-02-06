@@ -273,10 +273,10 @@ func (i *Indexer) UpdateFileIndexAfterBlockWrite(filePath string, blockIndex int
 	defer i.mu.Unlock()
 
 	// Get fresh index
-	fi, err = i.indexDB.GetFileIndex(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to get file index: %w", err)
-	}
+	// fi, err = i.indexDB.GetFileIndex(filePath)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get file index: %w", err)
+	// }
 	if fi == nil {
 		fi = &FileIndex{
 			Path:     filePath,
