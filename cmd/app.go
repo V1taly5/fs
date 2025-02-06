@@ -55,7 +55,7 @@ func main() {
 
 	watcherConfig := watcher.Config{
 		DebounceDuration: 500 * time.Millisecond,
-		IgnorePatterns:   []string{":Zone.Identifier", ".tmp"},
+		IgnorePatterns:   []string{":Zone.Identifier", ".tmp", "~", ".swp", ".swo", ".swx", "#", "#", "/tmp/"},
 		Logger:           nil,
 	}
 
