@@ -1,10 +1,12 @@
-package node
+package peers
 
 import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fs/internal/crypto"
+	utiljson "fs/internal/util/utilJson"
 	"net"
 	"sync"
 )
@@ -22,7 +24,7 @@ type SharedKey struct {
 }
 
 func (h HandShake) ToJson() []byte {
-	return toJson(h)
+	return utiljson.ToJson(h)
 }
 
 func (sk *SharedKey) Update(remoteKey []byte, localKey []byte) {
@@ -35,9 +37,14 @@ func (sk *SharedKey) Update(remoteKey []byte, localKey []byte) {
 	}
 
 	if sk.LocalKey != nil && sk.RemoteKey != nil {
-		secret := CalcSharedSecret(sk.RemoteKey, sk.LocalKey)
+		secret := crypto.CalcSharedSecret(sk.RemoteKey, sk.LocalKey)
 		sk.Secret = secret
 	}
+}
+
+type ICover interface {
+	GetCmd() []byte
+	GetMessage() []byte
 }
 
 type Peer struct {
@@ -50,7 +57,7 @@ type Peer struct {
 
 type Peers struct {
 	sync.RWMutex
-	peers map[string]*Peer
+	Peers map[string]*Peer
 }
 
 func NewPeer(conn net.Conn) *Peer {
@@ -69,16 +76,16 @@ func NewPeer(conn net.Conn) *Peer {
 
 func NewPeers() *Peers {
 	return &Peers{
-		peers: make(map[string]*Peer),
+		Peers: make(map[string]*Peer),
 	}
 }
 
-func (p *Peer) UpdatePeer(cover *Cover) error {
-	if string(cover.Cmd) != "HAND" {
+func (p *Peer) UpdatePeer(cover ICover) error {
+	if string(cover.GetCmd()) != "HAND" {
 		return errors.New("Invalid command")
 	}
 	handShake := &HandShake{}
-	err := json.Unmarshal(cover.Message, handShake)
+	err := json.Unmarshal(cover.GetMessage(), handShake)
 	if err != nil {
 		return err
 	}
@@ -107,23 +114,23 @@ func (p *Peer) UpdatePeer(cover *Cover) error {
 func (p *Peers) Put(peer *Peer) {
 	p.Lock()
 	defer p.Unlock()
-	p.peers[string(peer.PubKey)] = peer
+	p.Peers[string(peer.PubKey)] = peer
 }
 
 func (p *Peers) Get(key string) (peer *Peer, found bool) {
 	p.RLock()
 	defer p.RUnlock()
 
-	peer, found = p.peers[key]
+	peer, found = p.Peers[key]
 	return
 }
 
 func (p *Peers) Gets() map[string]*Peer {
-	return p.peers
+	return p.Peers
 }
 
 func (p *Peers) Remove(key *Peer) {
 	p.RLock()
 	defer p.RUnlock()
-	delete(p.peers, string(key.PubKey))
+	delete(p.Peers, string(key.PubKey))
 }

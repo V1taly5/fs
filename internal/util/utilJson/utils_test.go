@@ -1,4 +1,4 @@
-package node
+package utiljson
 
 import (
 	"testing"
@@ -45,7 +45,7 @@ func TestToJson(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonBytes := toJson(tt.input)
+			jsonBytes := ToJson(tt.input)
 			if tt.wantErr {
 				require.Nil(t, jsonBytes, "Expected nil result due to serialization error")
 			} else {

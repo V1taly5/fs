@@ -4,23 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"fs/internal/node"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 )
-
-// AppContext хранит зависимости, которые будут использоваться в командах CLI
-type AppContext struct {
-	Node *node.Node
-}
-
-func NewAppContext(node *node.Node) *AppContext {
-	return &AppContext{
-		Node: node,
-	}
-}
 
 // AttachCommand добавляет команды к корневой команде
 func AttachCommand(cmd *cobra.Command) {
@@ -30,6 +18,9 @@ func AttachCommand(cmd *cobra.Command) {
 func CliStart(ctx context.Context, args []string, appCtx *AppContext) {
 	AttachCommand(createEchoCommand(appCtx))
 	AttachCommand(createFileSendingCommand(appCtx))
+	AttachCommand(createListPeersCommand(appCtx))
+	AttachCommand(createConnectPeerCommand(appCtx))
+	AttachCommand(createIndexSendingCommand(appCtx))
 
 	if len(args) > 1 {
 		if err := Execute(); err != nil {

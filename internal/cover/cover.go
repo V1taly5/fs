@@ -1,9 +1,10 @@
-package node
+package cover
 
 import (
 	"bufio"
 	"crypto/rand"
 	"encoding/binary"
+	"fs/internal/peers"
 	"io"
 	"log"
 )
@@ -41,6 +42,14 @@ func NewCover(cmd string, message []byte) (cover *Cover) {
 		Message: message[0:messageLength],
 	}
 	return
+}
+
+func (c *Cover) GetCmd() []byte {
+	return c.Cmd
+}
+
+func (c *Cover) GetMessage() []byte {
+	return c.Message
 }
 
 func NewSignedCover(cmd string, from []byte, to []byte, sign []byte, message []byte) (cover *Cover) {
@@ -116,7 +125,7 @@ func ReadCover(reader *bufio.Reader) (*Cover, error) {
 	return cover, nil
 }
 
-func (c Cover) Send(peer *Peer) error {
+func (c Cover) Send(peer *peers.Peer) error {
 	log.Default().Printf("Send %s to peer %s ", c.Cmd, peer.Name)
 	_, err := (*peer.Conn).Write(c.Serialize())
 	if err != nil {

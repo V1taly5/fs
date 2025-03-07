@@ -21,3 +21,7 @@ text.txt
 *.jpg
 
 *.env
+
+testFolder
+.blocks
+/db

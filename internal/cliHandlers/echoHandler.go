@@ -35,3 +35,21 @@ func HandleSendFile(path string, n *node.Node) {
 		}
 	}
 }
+
+// HandleSendIndex
+func HandleSendIndex(n *node.Node) {
+	peers := n.Peers.Gets()
+	for key := range peers {
+		fmt.Println([]byte(key))
+		peer, found := n.Peers.Get(key)
+		if found == true {
+			err := n.SendIndex(peer)
+			if err != nil {
+				fmt.Printf("CLI Ошибка")
+			}
+			fmt.Printf(peer.Name)
+		} else {
+			fmt.Println("Пир для отправки файла не найден")
+		}
+	}
+}

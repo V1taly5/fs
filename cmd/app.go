@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"fs/internal/cli"
 	"fs/internal/config"
 	"fs/internal/discover"
 	"fs/internal/listener"
 	"fs/internal/node"
 	"fs/internal/util/logger/handlers/slogpretty"
+	"fs/internal/util/logger/sl"
+	"fs/internal/watcher"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const (
@@ -48,10 +52,30 @@ func main() {
 	}()
 
 	n := node.NewNode(cfg.Name, cfg.Port, log)
-	cmdContext := cli.NewAppContext(n)
+
+	watcherConfig := watcher.Config{
+		DebounceDuration: 500 * time.Millisecond,
+		IgnorePatterns:   []string{":Zone.Identifier", ".tmp", "~", ".swp", ".swo", ".swx", "#", "#", "/tmp/"},
+		Logger:           nil,
+	}
+
+	watchPath := "/home/vito/Source/projects/fs/testFolder"
+	// watcher, err := watcher.StartWatching("/home/vito/Source/projects/fs/testFolder", n.IndexDB)
+	watcher, err := watcher.NewFileWatcher(n.Indexer, watcherConfig)
+	if err != nil {
+		log.Error("Watcher err", sl.Err(err))
+	}
+	err = watcher.Watch(watchPath)
+	if err != nil {
+		watcher.Close()
+		fmt.Errorf("failed to watch directory: %w", err)
+	}
+	n.Watcher = watcher
 
 	go listener.StartListener(ctx, n, cfg.Port, log)
-	go discover.StartDiscover(ctx, n, cfg.Peers, log)
+	discover := discover.StartDiscover(ctx, n, cfg.Peers, log)
+
+	cmdContext := cli.NewAppContext(n, discover)
 
 	remainingArgs := flag.Args()
 	cli.CliStart(ctx, remainingArgs, cmdContext)
