@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	discoverymodels "fs/internal/discovery_manager/models"
 	"fs/internal/node"
 	"fs/internal/util/logger/sl"
 )
 
 type PeerDiscoveryManager struct {
-	config          *PeerDiscoveryConfig
+	config          *discoverymodels.PeerDiscoveryConfig
 	node            *node.Node
 	log             *slog.Logger
 	discoveredPeers *sync.Map
@@ -30,7 +31,7 @@ type PeerDiscoveryManager struct {
 func NewPeerDiscoveryManager(
 	ctx context.Context,
 	n *node.Node,
-	config *PeerDiscoveryConfig,
+	config *discoverymodels.PeerDiscoveryConfig,
 	log *slog.Logger,
 ) *PeerDiscoveryManager {
 	ctx, cancel := context.WithCancel(ctx)
