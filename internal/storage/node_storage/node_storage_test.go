@@ -317,6 +317,121 @@ func TestSaveNodeUpdateEndpoints(t *testing.T) {
 	assert.WithinDuration(t, node.Endpoints[1].LastSuccess, updatedNode.Endpoints[1].LastSuccess, time.Second)
 }
 
+func TestNodeStorage_GetNodeEndpoints(t *testing.T) {
+	ctx := context.Background()
+	storage := setupTestStorage(t)
+
+	testCases := []struct {
+		name          string
+		setupFunc     func(t *testing.T) string
+		expectedErr   string
+		expectedCount int
+	}{
+		{
+			name: "successful receipt of endpoints",
+			setupFunc: func(t *testing.T) string {
+				nodeID := "test-node-5"
+				node := Node{
+					ID:           nodeID,
+					PublicKey:    []byte("test-public-key"),
+					Name:         "Test Node 5",
+					FirstSeen:    time.Now().Add(-24 * time.Hour),
+					LastSeen:     time.Now(),
+					Capabilities: map[string]interface{}{"feature1": true},
+					IsIntroducer: false,
+					IsTrusted:    false,
+					Endpoints: []Endpoint{
+						{
+							NodeID:       "test-node-5",
+							Address:      "192.168.1.1",
+							Port:         8080,
+							Protocol:     ProtocolTCP,
+							Source:       SourceStatic,
+							LastSuccess:  time.Now(),
+							SuccessCount: 10,
+							FailureCount: 2,
+							Priority:     5,
+						},
+						{
+							NodeID:       "test-node-6",
+							Address:      "192.168.1.2",
+							Port:         8080,
+							Protocol:     "http",
+							Source:       "discovery",
+							SuccessCount: 5,
+							FailureCount: 0,
+							Priority:     2,
+						},
+					},
+				}
+
+				err := storage.SaveNode(ctx, node)
+				assert.NoError(t, err)
+				return nodeID
+			},
+			expectedCount: 2,
+		},
+		{
+			name: "no endpoints for the node",
+			setupFunc: func(t *testing.T) string {
+				nodeID := "test-node-2"
+				node := Node{
+					ID:           nodeID,
+					PublicKey:    []byte("test-public-key-2"),
+					Name:         "Test Node 2",
+					FirstSeen:    time.Now().Add(-24 * time.Hour),
+					LastSeen:     time.Now(),
+					Capabilities: map[string]interface{}{"feature2": true},
+					IsIntroducer: true,
+					IsTrusted:    true,
+					Endpoints:    []Endpoint{}, // Пусто
+				}
+
+				err := storage.SaveNode(ctx, node)
+				assert.NoError(t, err)
+				return nodeID
+			},
+			expectedCount: 0,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ResetTestDB(storage.db)
+			assert.NoError(t, err)
+
+			nodeID := tc.setupFunc(t)
+
+			endpoints, err := storage.getNodeEndpoints(ctx, nodeID)
+			if tc.expectedErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, endpoints, tc.expectedCount)
+
+				if tc.name == "successful receipt of endpoints" && len(endpoints) >= 2 {
+					// Проверка первого эндпоинта
+					assert.Equal(t, nodeID, endpoints[0].NodeID)
+					assert.Equal(t, "192.168.1.1", endpoints[0].Address)
+					assert.Equal(t, 8080, endpoints[0].Port)
+					assert.Equal(t, ProtocolTCP, endpoints[0].Protocol)
+					assert.Equal(t, SourceStatic, endpoints[0].Source)
+					assert.Equal(t, 10, endpoints[0].SuccessCount)
+					assert.Equal(t, 2, endpoints[0].FailureCount)
+					assert.Equal(t, 5, endpoints[0].Priority)
+
+					// Проверка второго эндпоинта
+					assert.Equal(t, nodeID, endpoints[1].NodeID)
+					assert.Equal(t, "192.168.1.2", endpoints[1].Address)
+				}
+			}
+			// Очищаем БД после теста
+			err = ResetTestDB(storage.db)
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func ResetTestDB(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
