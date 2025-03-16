@@ -91,7 +91,7 @@ type Config struct {
 // DefaultConfig returns a config with sensible defaults
 func DefaultConfig() Config {
 	return Config{
-		DBPath:            "nodes.db",
+		DBPath:            "database.sqlite",
 		MigrationsPath:    "migrations",
 		ConnectionTimeout: 5 * time.Second,
 		LogLevel:          slog.LevelInfo,
