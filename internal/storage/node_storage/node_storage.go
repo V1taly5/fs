@@ -589,6 +589,49 @@ func (s *NodeStorage) UpdateEndpoint(ctx context.Context, endpoint Endpoint) err
 	return nil
 }
 
+// UpdateEndpointStats updates the statistics of an endpoint based on connection success or failure
+func (s *NodeStorage) UpdateEndpointStats(ctx context.Context, endpointID int64, isSuccess bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var query string
+	var args []interface{}
+
+	if isSuccess {
+		query = `
+			UPDATE endpoints
+			SET last_success = ?, success_count = success_count + 1
+			WHERE id = ?`
+		args = []interface{}{time.Now().Unix(), endpointID}
+	} else {
+		query = `
+			UPDATE endpoints
+			SET failure_count = failure_count + 1
+			WHERE id = ?`
+		args = []interface{}{endpointID}
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("%w: failed to update endpoint stats: %v", ErrDBOperationFailed, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%w: failed to get rows affected: %v", ErrDBOperationFailed, err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrEndpointNotFound
+	}
+
+	s.logger.Debug("Update endpoint stats",
+		"endpoint_id", endpointID,
+		"is_seccess", isSuccess,
+	)
+	return nil
+}
+
 // DeleteEndpoint removes an endpoint
 func (s *NodeStorage) DeleteEndpoint(ctx context.Context, endpointID int64) error {
 	s.mu.Lock()
