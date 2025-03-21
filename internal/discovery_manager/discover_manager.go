@@ -188,7 +188,7 @@ func (m *PeerDiscoveryManager) GetDiscoveredPeers() []string {
 
 // Shutdown останавливает все механизмы обнаружения
 func (m *PeerDiscoveryManager) Shutdown() {
-	op := "discover_ manager.Shutdown"
+	op := "discover_manager.Shutdown"
 	log := m.log.With(slog.String("op", op))
 
 	m.mechanismsLock.Lock()
