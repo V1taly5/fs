@@ -1,4 +1,4 @@
-.PHONY: app disc-mgr migrate migrate-up migrate-down migrate-rollback migrate-to migrate-version
+.PHONY: app disc-mgr migrate cli migrate-up migrate-down migrate-rollback migrate-to migrate-version
 
 # Переменная для пути к файлу миграции
 MAIN_MIGRATE = cmd/migrate/main.go
@@ -12,6 +12,8 @@ disc-mgr:
 	go run cmd/discover_manager/main.go -config=./.env
 migrate:
 	migrate create -ext sql -dir ./migrations -seq ($name)
+cli:
+	go run cmd/cli/main.go
 migrate-up:
 	$(MIGRATE) -direction up
 migrate-down:
