@@ -312,7 +312,7 @@ func (s *NodeStorage) GetNode(ctx context.Context, nodeID string) (Node, error) 
 	}
 
 	// get endpoints
-	node.Endpoints, err = s.getNodeEndpoints(ctx, nodeID)
+	node.Endpoints, err = s.GetNodeEndpoints(ctx, nodeID)
 	if err != nil {
 		s.logger.Warn("Failed to get node endpoints",
 			"node_id", node.ID, "error", err)
@@ -331,7 +331,7 @@ func (s *NodeStorage) GetNode(ctx context.Context, nodeID string) (Node, error) 
 }
 
 // getNodeEndpoints retrieves all endpoints for a given node
-func (s *NodeStorage) getNodeEndpoints(ctx context.Context, nodeID string) ([]Endpoint, error) {
+func (s *NodeStorage) GetNodeEndpoints(ctx context.Context, nodeID string) ([]Endpoint, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, node_id, address, port, protocol, source,
 		       last_success, success_count, failure_count, priority

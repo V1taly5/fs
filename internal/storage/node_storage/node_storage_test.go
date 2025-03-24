@@ -401,7 +401,7 @@ func TestNodeStorage_GetNodeEndpoints(t *testing.T) {
 
 			nodeID := tc.setupFunc(t)
 
-			endpoints, err := storage.getNodeEndpoints(ctx, nodeID)
+			endpoints, err := storage.GetNodeEndpoints(ctx, nodeID)
 			if tc.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectedErr)
