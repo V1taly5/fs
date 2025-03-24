@@ -2,10 +2,36 @@ package connectionmanager
 
 import (
 	"context"
+	"fs/internal/node"
 	nodestorage "fs/internal/storage/node_storage"
 	"log/slog"
+	"sync"
 	"time"
 )
+
+func NewConnectionManager(
+	ctx context.Context,
+	node *node.Node,
+	db NodeDB,
+	config *ConnectionConfig,
+	log *slog.Logger,
+) *ConnectionManager {
+	ctx, cancel := context.WithCancel(ctx)
+
+	manager := &ConnectionManager{
+		node:         node,
+		db:           db,
+		log:          log,
+		config:       config,
+		activeConns:  &sync.Map{},
+		connAttempts: &sync.Map{},
+		connFactory:  NewConnectionFactory(node, log),
+		ctx:          ctx,
+		cancel:       cancel,
+	}
+
+	return manager
+}
 
 func (m *ConnectionManager) ConnectToEndpoint(
 	ctx context.Context,
