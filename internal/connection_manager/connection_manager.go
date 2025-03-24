@@ -68,6 +68,7 @@ func (m *ConnectionManager) ConnectToEndpoint(
 	if err != nil {
 		// обнавляем статистиук в базе данных (неудачная попытка)
 		// UpdateEndpointStats(endpoint.ID, false)
+		m.db.UpdateEndpointStats(ctx, endpoint.ID, false)
 
 		log.Error("Failed to connect to endpoint",
 			slog.String("node_id", endpoint.NodeID),
@@ -111,10 +112,7 @@ func (m *ConnectionManager) ConnectToEndpoint(
 	}
 	// соединение успешно
 	// обновляем статистику в бд (успешная попытка)
-	// UpdateEndpointStats(endpoint.ID, true)
-
-	// обновление timestamp последнего взаимодействия с узлом
-	// UpdateNodeLastSeen(endpoint.NodeID)
+	m.db.UpdateEndpointStats(ctx, endpoint.ID, true)
 
 	// сбарсываем счетчик попыток
 	m.connAttempts.Delete(endpoint.NodeID)

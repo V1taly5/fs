@@ -66,9 +66,8 @@ type ConnectionManager struct {
 }
 
 type NodeDB interface {
-	GetAllNodes() ([]nodestorage.Node, error)
-	GetNodeByID(nodeID string) (nodestorage.Node, error)
-	GetEndpointsForNode(nodeID string) ([]nodestorage.Endpoint, error)
-	UpdateEndpointState(endpointID int64, success bool, timestamp int64) error
-	UpdateNodeLastSeen(nodeID string, timestamp int64) error
+	ListNodes(context.Context, nodestorage.NodeFilter) ([]nodestorage.Node, error)
+	GetNode(context.Context, string) (nodestorage.Node, error)
+	GetNodeEndpoints(context.Context, string) ([]nodestorage.Endpoint, error)
+	UpdateEndpointStats(ctx context.Context, endpointID int64, isSuccess bool) error
 }
