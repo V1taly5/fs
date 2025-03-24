@@ -10,8 +10,8 @@ import (
 	nodestorage "fs/internal/storage/node_storage"
 )
 
-// ConnetionConfig содержит настройки для conneciton_manager
-type ConnetionConfig struct {
+// ConnectionConfig содержит настройки для conneciton_manager
+type ConnectionConfig struct {
 	ConnectionTimeout time.Duration
 	BaseRetryInterval time.Duration
 	MaxRetryInterval  time.Duration
@@ -40,9 +40,9 @@ type Connection interface {
 
 // Connector определяет интерфейс для различных типов соединений
 type Connector interface {
-	// Connect устанавливает соединение с заданным endpoint
+	// connect устанавливает соединение с заданным endpoint
 	Connect(ctx context.Context, endpoints nodestorage.Endpoint) (Connection, error)
-	// SuportProtocol проверяет, проддерживает ли данный протокол
+	// suportProtocol проверяет, проддерживает ли данный протокол
 	SuportProtocol(protocol string) bool
 	Name() string
 }
@@ -57,7 +57,7 @@ type ConnectionManager struct {
 	node         *node.Node
 	db           NodeDB
 	log          *slog.Logger
-	config       *ConnetionConfig
+	config       *ConnectionConfig
 	activeConns  *sync.Map // map[string]Connection
 	connAttempts *sync.Map // map[string]int
 	connFactory  *ConnectionFactory
