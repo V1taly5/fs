@@ -3,13 +3,16 @@ package discoverymanager
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	multicastdiscovery "fs/internal/discovery_manager/discovery_mechanism/multicast_discovery"
 	discoverymodels "fs/internal/discovery_manager/models"
 	"fs/internal/node"
+	nodestorage "fs/internal/storage/node_storage"
 	"fs/internal/util/logger/sl"
 	"log/slog"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -19,6 +22,7 @@ func NewPeerDiscoveryManager(
 	ctx context.Context,
 	n *node.Node,
 	config *discoverymodels.PeerDiscoveryConfig,
+	nodeStorage NodeDB,
 	log *slog.Logger,
 ) *PeerDiscoveryManager {
 	ctx, cancel := context.WithCancel(ctx)
@@ -27,6 +31,7 @@ func NewPeerDiscoveryManager(
 		config:          config,
 		node:            n,
 		log:             log,
+		node_storage:    nodeStorage,
 		discoveredPeers: &sync.Map{},
 		peerConnections: &sync.Map{},
 		mechanisms:      make(map[string]discoverymodels.DiscoveryMechanism),
@@ -101,11 +106,25 @@ func (m *PeerDiscoveryManager) onPeerDiscovered(address string, publicKey []byte
 		return
 	}
 
-	// проверка существования пира
-	_, exists := m.node.Peers.Get(string(publicKey))
-	if exists {
-		return
+	hashPublicKey := sha256.Sum256(publicKey)
+	_, err := m.node_storage.GetNode(m.ctx, hex.EncodeToString(hashPublicKey[:]))
+	// if err == nil {
+	// 	return
+	// }
+	if err != nil {
+		if err == nodestorage.ErrNodeNotFound {
+			log.Debug("node not fount", sl.Err(err))
+		} else {
+			log.Error("err get Nnde", sl.Err(err))
+			return
+		}
 	}
+
+	// проверка существования пира
+	// _, exists := m.node.Peers.Get(string(publicKey))
+	// if exists {
+	// 	return
+	// }
 
 	// логирование обнаруженного пира
 	log.Info("New peer discovered",
@@ -113,8 +132,37 @@ func (m *PeerDiscoveryManager) onPeerDiscovered(address string, publicKey []byte
 		slog.String("public_key", hex.EncodeToString(publicKey)),
 	)
 
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		log.Error("failed to Split Host Port", sl.Err(err))
+		return
+	}
+	strPort, err := strconv.Atoi(port)
+	if err != nil {
+		log.Error("failed to convert string port to int port", sl.Err(err))
+		return
+	}
+
+	newNode := nodestorage.Node{
+		ID:        hex.EncodeToString(hashPublicKey[:]),
+		PublicKey: publicKey,
+		Name:      string(publicKey),
+		FirstSeen: time.Now(),
+		LastSeen:  time.Now(),
+		Endpoints: []nodestorage.Endpoint{
+			{
+				NodeID:   hex.EncodeToString(hashPublicKey[:]),
+				Address:  address,
+				Port:     strPort,
+				Protocol: nodestorage.ProtocolTCP,
+				Source:   nodestorage.SourceLocal,
+			},
+		},
+	}
+	m.node_storage.SaveNode(m.ctx, newNode)
+
 	// добавление в список обнаруженных пиров
-	m.discoveredPeers.Store(address, publicKey)
+	// m.discoveredPeers.Store(address, publicKey)
 
 	// опциональная автоматическая попытка подключения
 	if m.config.AutoconnectEnabled {
@@ -137,22 +185,65 @@ func (m *PeerDiscoveryManager) startPeriodicPeerValidation(ctx context.Context) 
 	}
 }
 
+// TODO: modification, removal of inactive peers from the map for deletion from the database - done
 // validateAndPrunePeers удаляет неактивные пиры
 func (m *PeerDiscoveryManager) validateAndPrunePeers() {
 	op := "discover_ manager.validateAndPrunePeers"
 	log := m.log.With(slog.String("op", op))
 
-	m.discoveredPeers.Range(func(key, value interface{}) bool {
-		peerAddr := key.(string)
-		conn, err := net.DialTimeout("tcp", peerAddr, m.config.ConnectionTimeout)
-		if err != nil {
-			log.Debug("Removing unresponsive peer", slog.String("address", peerAddr))
-			m.discoveredPeers.Delete(key)
-			return true
+	// TODO: create filter
+	nodes, err := m.node_storage.ListNodes(m.ctx, nodestorage.NodeFilter{})
+	if err != nil {
+		log.Error("Failed to get list nodes", sl.Err(err))
+		return
+	}
+
+	for _, node := range nodes {
+		for _, endpoint := range node.Endpoints {
+			valid := false
+
+			switch endpoint.Protocol {
+			case nodestorage.ProtocolTCP:
+				if endpoint.Source == nodestorage.SourceLocal {
+					conn, err := net.DialTimeout("tcp", endpoint.Address, m.config.ConnectionTimeout)
+					if err == nil {
+						conn.Close()
+						valid = true
+					}
+				}
+			default:
+				// skip other protocols for now
+				log.Debug("Skipping validation for unsupported protocol",
+					slog.String("protocol", string(endpoint.Protocol)),
+					slog.String("nodeID", node.ID))
+				continue
+
+			}
+			if !valid {
+				log.Debug("Removing unresponsive endpoint",
+					slog.String("nodeID", node.ID),
+					slog.String("address", endpoint.Address),
+					slog.Int("port", endpoint.Port),
+					slog.String("protocol", string(endpoint.Protocol)))
+				err := m.node_storage.DeleteEndpoint(m.ctx, endpoint.ID)
+				if err != nil {
+					log.Error("Failed to delete endpoint", slog.Int64("EndpointID", endpoint.ID), sl.Err(err))
+				}
+			}
 		}
-		conn.Close()
-		return true
-	})
+	}
+	// for sync.Map storage
+	// m.discoveredPeers.Range(func(key, value interface{}) bool {
+	// 	peerAddr := key.(string)
+	// 	conn, err := net.DialTimeout("tcp", peerAddr, m.config.ConnectionTimeout)
+	// 	if err != nil {
+	// 		log.Debug("Removing unresponsive peer", slog.String("address", peerAddr))
+	// 		m.discoveredPeers.Delete(key)
+	// 		return true
+	// 	}
+	// 	conn.Close()
+	// 	return true
+	// })
 }
 
 // attemptPeerConnection пытается установить соединение с пиром
@@ -176,6 +267,7 @@ func (m *PeerDiscoveryManager) attemptPeerConnection(peerAddress string) {
 	)
 }
 
+// TODO: modification, returning the list of detected peers from the database - done (GetDBDiscoveredPeers)
 // GetDiscoveredPeers возвращает список обнаруженных пиров
 func (m *PeerDiscoveryManager) GetDiscoveredPeers() []string {
 	peers := []string{}
@@ -184,6 +276,14 @@ func (m *PeerDiscoveryManager) GetDiscoveredPeers() []string {
 		return true
 	})
 	return peers
+}
+
+func (m *PeerDiscoveryManager) GetDBDiscoveredPeers() ([]nodestorage.Node, error) {
+	nodes, err := m.node_storage.ListNodes(m.ctx, nodestorage.NodeFilter{})
+	if err != nil {
+		return nil, err
+	}
+	return nodes, nil
 }
 
 // Shutdown останавливает все механизмы обнаружения

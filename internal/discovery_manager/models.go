@@ -4,6 +4,7 @@ import (
 	"context"
 	discoverymodels "fs/internal/discovery_manager/models"
 	"fs/internal/node"
+	nodestorage "fs/internal/storage/node_storage"
 	"log/slog"
 	"sync"
 )
@@ -12,6 +13,7 @@ import (
 type PeerDiscoveryManager struct {
 	config          *discoverymodels.PeerDiscoveryConfig
 	node            *node.Node
+	node_storage    NodeDB
 	log             *slog.Logger
 	discoveredPeers *sync.Map
 	peerConnections *sync.Map
@@ -19,4 +21,11 @@ type PeerDiscoveryManager struct {
 	mechanismsLock  sync.RWMutex
 	ctx             context.Context
 	cancel          context.CancelFunc
+}
+
+type NodeDB interface {
+	SaveNode(context.Context, nodestorage.Node) error
+	GetNode(context.Context, string) (nodestorage.Node, error)
+	ListNodes(context.Context, nodestorage.NodeFilter) ([]nodestorage.Node, error)
+	DeleteEndpoint(ctx context.Context, endpointID int64) error
 }
