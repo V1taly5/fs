@@ -10,11 +10,13 @@ import (
 	"log/slog"
 
 	"fs/internal/config"
+	connectionmanager "fs/internal/connection_manager"
 	discoverymanager "fs/internal/discovery_manager"
 	discoverymodels "fs/internal/discovery_manager/models"
-	"fs/internal/listener"
 	"fs/internal/node"
+	nodestorage "fs/internal/storage/node_storage"
 	"fs/internal/util/logger/handlers/slogpretty"
+	"fs/internal/util/logger/sl"
 )
 
 const (
@@ -60,15 +62,51 @@ func main() {
 		AutoconnectEnabled: false,
 	}
 
+	storageConfig := nodestorage.DefaultConfig()
+	storage, err := nodestorage.New(storageConfig, log)
+	if err != nil {
+		log.Error("failed init node storage")
+		return
+	}
+
 	// Создаем менеджер обнаружения пиров
-	discoveryManager := discoverymanager.NewPeerDiscoveryManager(ctx, n, discoveryConfig, log)
+	discoveryManager := discoverymanager.NewPeerDiscoveryManager(ctx, n, discoveryConfig, storage, log)
 
 	// Запускаем механизмы обнаружения
 	discoveryManager.Start()
 
 	log.Info("Peer discovery manager started")
 
-	go listener.StartListener(ctx, n, cfg.Port, log)
+	connectionConfig := &connectionmanager.ConnectionConfig{
+		ConnectionTimeout: time.Second * 30,
+		BaseRetryInterval: time.Second * 1,
+		MaxRetryInterval:  time.Second * 60,
+		MaxRetryCount:     5,
+	}
+
+	connectionManager := connectionmanager.NewConnectionManager(ctx, n, storage, connectionConfig, log)
+
+	time.Sleep(9 * time.Second)
+
+	retryOptions := &connectionmanager.RetryOptions{
+		MaxAttempts:    3,
+		UseExponential: true,
+		InitialDelay:   time.Second,
+		MaxDelay:       time.Second * 10,
+	}
+	node, err := storage.GetNode(ctx, "d9c8327530a1527c5eb755f0c92bfa693012b8f7a7737594f92f647e4dd28427")
+	if err != nil {
+		log.Error("failed to get node for ID", sl.Err(err))
+		return
+	}
+
+	_, err = connectionManager.ConnectToEndpoint(ctx, node.Endpoints[0], retryOptions)
+	if err != nil {
+		log.Error("failed to create Connection to Node endpoint", sl.Err(err))
+		return
+	}
+
+	// go listener.StartListener(ctx, n, cfg.Port, log)
 
 	// Graceful shutdown
 	defer func() {

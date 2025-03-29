@@ -97,6 +97,7 @@ func (c *TCPConnector) Connect(ctx context.Context, endpoint nodestorage.Endpoin
 
 }
 
+// TODO:
 func (c *TCPConnector) performHandShake(ctx context.Context, conn net.Conn, endpoint nodestorage.Endpoint) (bool, error) {
 	return true, nil
 }
@@ -110,7 +111,6 @@ func (c *TCPConnector) Name() string {
 }
 
 // TCP Connection
-
 type TCPConnection struct {
 	conn     net.Conn
 	endpoint nodestorage.Endpoint
