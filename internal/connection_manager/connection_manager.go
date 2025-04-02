@@ -4,6 +4,7 @@ import (
 	"context"
 	"fs/internal/node"
 	nodestorage "fs/internal/storage/node_storage"
+	fsv1 "fs/proto/gen/go"
 	"log/slog"
 	"sync"
 	"time"
@@ -23,14 +24,33 @@ func NewConnectionManager(
 		db:           db,
 		log:          log,
 		config:       config,
-		activeConns:  &sync.Map{},
-		connAttempts: &sync.Map{},
+		activeConns:  &sync.Map{}, // nodeID -> Connection
+		connAttempts: &sync.Map{}, // nodeID -> int
 		connFactory:  NewConnectionFactory(node, log),
 		ctx:          ctx,
 		cancel:       cancel,
+
+		processMap: &sync.Map{},
+	}
+	manager.msgProcessor = NewMessageProcessor(ctx, node, log)
+	return manager
+}
+
+func (m *ConnectionManager) ConnectToEndpointWithAutoStartProcess(
+	ctx context.Context,
+	endpoint nodestorage.Endpoint,
+	retryOptions *RetryOptions,
+) (Connection, error) {
+	conn, err := m.ConnectToEndpoint(ctx, endpoint, retryOptions)
+	if err != nil {
+		return nil, err
 	}
 
-	return manager
+	if m.config.AutoStartProcess {
+		m.startProcessingForConnection(conn)
+	}
+
+	return conn, nil
 }
 
 func (m *ConnectionManager) ConnectToEndpoint(
@@ -38,7 +58,7 @@ func (m *ConnectionManager) ConnectToEndpoint(
 	endpoint nodestorage.Endpoint,
 	retryOptions *RetryOptions,
 ) (Connection, error) {
-	op := "connecton_manager.ConnectToEndpoint"
+	op := "connection_manager.ConnectToEndpoint"
 	log := m.log.With(slog.String("op", op))
 
 	if conn, exists := m.GetActiveConnectionForNode(endpoint.NodeID); exists {
@@ -204,4 +224,118 @@ func calculateExponentialBackoff(baseDelay time.Duration, attemt int, maxDelay t
 	}
 
 	return delay
+}
+
+func (m *ConnectionManager) InitMessageProcessor() {
+	m.processLock.Lock()
+	defer m.processLock.Unlock()
+
+	if m.msgProcessor == nil {
+		m.msgProcessor = NewMessageProcessor(m.ctx, m.node, m.log)
+	}
+}
+
+func (m *ConnectionManager) RegisterMessageHandler(msgType string, handler MsgHandler) {
+	m.processLock.Lock()
+	defer m.processLock.Unlock()
+
+	if m.msgProcessor == nil {
+		m.msgProcessor = NewMessageProcessor(m.ctx, m.node, m.log)
+	}
+
+	m.msgProcessor.RegisterHandler(msgType, handler)
+}
+
+// Starts message processing for all connections
+func (m *ConnectionManager) StartMessageProcessing() {
+	m.processLock.Lock()
+	defer m.processLock.Unlock()
+
+	if m.msgProcessor == nil {
+		m.msgProcessor = NewMessageProcessor(m.ctx, m.node, m.log)
+	}
+
+	// starting processing for all active connections
+	connections := m.GetActiveConnection()
+	for _, conn := range connections {
+		m.startProcessingForConnection(conn)
+	}
+
+	m.log.Info("Message processing started for all active connections",
+		slog.Int("connection_count", len(connections)))
+}
+
+// Starts message processing for one connection
+func (m *ConnectionManager) startProcessingForConnection(conn Connection) {
+	nodeID := conn.NodeID()
+
+	if started, exists := m.processMap.LoadOrStore(nodeID, true); exists && started.(bool) {
+		return
+	}
+
+	conn.StartReading(m.msgProcessor.ctx)
+
+	go func() {
+		m.msgProcessor.ProcessConnectionMessages(conn)
+		m.processMap.Store(nodeID, false)
+	}()
+
+	m.log.Info("Started message processing for connection",
+		slog.String("node_id", nodeID),
+		slog.String("address", conn.Address()))
+}
+
+func (m *ConnectionManager) StopMessageProcessing() {
+	m.processLock.Lock()
+	defer m.processLock.Unlock()
+
+	if m.msgProcessor != nil {
+		m.msgProcessor.Stop()
+		m.processMap = &sync.Map{}
+		m.log.Info("Message processing stopped for all connections")
+	}
+}
+
+func (m *ConnectionManager) Shutdown() {
+	m.log.Info("Shutting down connection manager")
+
+	m.StopMessageProcessing()
+
+	m.activeConns.Range(func(key, value interface{}) bool {
+		conn := value.(Connection)
+		nodeID := key.(string)
+
+		if err := conn.Close(); err != nil {
+			m.log.Error("Error closing connection",
+				slog.String("node_id", nodeID),
+				slog.String("address", conn.Address()),
+				slog.String("error", err.Error()))
+		} else {
+			m.log.Info("Connection closed",
+				slog.String("node_id", nodeID),
+				slog.String("address", conn.Address()))
+		}
+
+		m.activeConns.Delete(nodeID)
+		return true
+	})
+
+	m.cancel()
+
+	m.log.Info("Connection manager shutdown complete")
+}
+
+func (m *ConnectionManager) SendMessage(ctx context.Context, nodeID string, msg *fsv1.Message) error {
+	connIface, exists := m.activeConns.Load(nodeID)
+	if !exists {
+		return ErrNoActiveConnection
+	}
+
+	conn := connIface.(Connection)
+	if !conn.IsActive() {
+		m.activeConns.Delete(nodeID)
+		return ErrConnectionInactive
+	}
+
+	return conn.SendMessage(ctx, msg)
 }

@@ -2,12 +2,22 @@ package connectionmanager
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"fs/internal/node"
 	nodestorage "fs/internal/storage/node_storage"
+	fsv1 "fs/proto/gen/go"
+)
+
+var (
+	ErrNoActiveConnection = errors.New("no active connection to node")
+	ErrConnectionInactive = errors.New("connection is inactive")
+	ErrMessageBufferFull  = errors.New("message buffer is full")
+	ErrContextCanceled    = errors.New("context was canceled")
+	ErrConnectionClosed   = errors.New("connection is closed")
 )
 
 // ConnectionConfig содержит настройки для conneciton_manager
@@ -15,8 +25,10 @@ type ConnectionConfig struct {
 	ConnectionTimeout time.Duration
 	BaseRetryInterval time.Duration
 	MaxRetryInterval  time.Duration
-	// максисальное кол-во попыток (0 - без ограничений)
+	// максимальное кол-во попыток (0 - без ограничений)
 	MaxRetryCount int
+
+	AutoStartProcess bool
 }
 
 type RetryOptions struct {
@@ -36,6 +48,9 @@ type Connection interface {
 	Protocol() string
 	Close() error
 	IsActive() bool
+	StartReading(context.Context)
+	SendMessage(context.Context, *fsv1.Message) error
+	MessageChannel() <-chan *fsv1.Message
 }
 
 // Connector определяет интерфейс для различных типов соединений
@@ -63,6 +78,10 @@ type ConnectionManager struct {
 	connFactory  *ConnectionFactory
 	ctx          context.Context
 	cancel       context.CancelFunc
+
+	msgProcessor *MessageProcessor
+	processLock  sync.Mutex
+	processMap   *sync.Map // nodeID -> bool (показывает, запущена ли обработка для данного соединения)
 }
 
 type NodeDB interface {
