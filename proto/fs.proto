@@ -1,0 +1,121 @@
+syntax = "proto3";
+package cover;
+
+option go_package = "fs.v1;fsv1";
+
+message Message {
+	uint64 massage_id = 1;
+	uint64 timestamp = 2;
+	string sender_id = 3;
+	string receiver_id = 4;
+
+	oneof payload {
+		Handshake handshake = 10;
+		PingMSG ping = 11;
+		PongMSG pong = 12;
+      IndexUpdate index_update = 13;
+		PeerStatus peer_status = 14;
+		BlockRequest block_request = 15;
+		BlockResponse block_response = 16;
+		PullRequest pull_request = 17;
+		PushRequest push_request = 18;
+		ErrorMessage error = 19;
+	}
+}
+
+message Handshake {
+	string protocol_version = 1;
+	string device_name = 2;
+	repeated string capabilities = 3;
+	bytes public_key = 4;
+}
+
+message PingMSG {
+	uint64 seq_num = 1;
+}
+
+message PongMSG {
+	uint64 seq_num = 1;
+	uint64 round_trip_time = 2;
+}
+
+message PeerStatus {
+	enum Status {
+		ONLINE = 0;
+		BUSY = 1;
+		AWAY = 2;
+		DISCONNECTING = 3;
+	}
+	Status status = 1;
+	uint32 cpu_load = 2;
+	uint64 free_disk_space = 3;
+	uint32 battary_level = 4;
+}
+
+message IndexUpdate {
+	repeated FileInfo files = 1;
+	bool is_full_update = 2;
+	uint64 sequence = 3;
+}
+
+message FileInfo {
+	string path = 1;
+	uint64 size = 2;
+	uint64 modified_time = 3;
+	string mode = 4;
+	bool is_directory = 5;
+	bytes file_id = 6;
+	repeated BlockInfo blocks = 7;
+	map<string, string> attributes = 8;
+}
+
+message BlockInfo {
+	uint32 index = 1;
+	uint32 sizy = 2;
+	bytes hash = 3;
+	bytes rolling_hash = 4;
+}
+
+message BlockRequest {
+	string file_id = 1;
+	repeated uint32 block_indexes = 2;
+}
+
+message BlockResponse {
+	string file_id = 1;
+	repeated Block blocks = 2;
+}
+
+message Block {
+	uint32 index = 1;
+	bytes data = 2;
+	bytes hash = 3;
+}
+
+message PullRequest {
+	repeated string file_ids = 1;
+	bool invlude_deltas = 2;
+	bool force = 3;
+}
+
+message PushRequest {
+	repeated string file_ids = 1;
+	uint64 total_size = 2;
+}
+
+message ErrorMessage {
+	enum ErrorCode {
+		UNKNOWN = 0;
+		INVALID_MESSAGE = 1;
+		CONNECTION_ERROR = 2;
+		AUTHENTICATION_ERROR = 3;
+		PERMISSION_DENIED = 4;
+		FILE_NOT_FOUND = 5;
+		BLOCK_NOT_FOUND = 6;
+		DISK_FULL = 7;
+		PROTOCOL_ERROR = 8;
+	}
+	ErrorCode code = 1;
+	string message = 2;
+	string context = 3;
+}
