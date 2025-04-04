@@ -12,6 +12,8 @@ disc-mgr:
 	go run cmd/discover_manager/main.go -config=./.env
 migrate:
 	migrate create -ext sql -dir ./migrations -seq ($name)
+cli:
+	go run cmd/cli/main.go
 migrate-up:
 	$(MIGRATE) -direction up
 migrate-down:
