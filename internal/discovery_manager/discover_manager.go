@@ -45,7 +45,7 @@ func NewPeerDiscoveryManager(
 	manager.RegisterDiscoveryMechanism(multicastMechanism)
 
 	// запускаем периодическую валидацию пиров
-	go manager.startPeriodicPeerValidation(ctx)
+	// go manager.startPeriodicPeerValidation(ctx)
 
 	return manager
 }
@@ -98,7 +98,7 @@ func (m *PeerDiscoveryManager) UnregisterDiscoveryMechanism(name string) {
 
 // onPeerDiscovered обрабатывает обнаружение нового пира
 func (m *PeerDiscoveryManager) onPeerDiscovered(address string, publicKey []byte) {
-	op := "discover_ manager.onPeerDiscovered"
+	op := "discover_manager.onPeerDiscovered"
 	log := m.log.With(slog.String("op", op))
 
 	// проверка, что это не наш собственный узел
@@ -107,67 +107,79 @@ func (m *PeerDiscoveryManager) onPeerDiscovered(address string, publicKey []byte
 	}
 
 	hashPublicKey := sha256.Sum256(publicKey)
-	_, err := m.node_storage.GetNode(m.ctx, hex.EncodeToString(hashPublicKey[:]))
-	// if err == nil {
-	// 	return
-	// }
+	nodeID := hex.EncodeToString(hashPublicKey[:])
+
+	_, portStr, err := net.SplitHostPort(address)
 	if err != nil {
-		if err == nodestorage.ErrNodeNotFound {
-			log.Debug("node not fount", sl.Err(err))
-		} else {
-			log.Error("err get Nnde", sl.Err(err))
+		log.Error("Failed to split host and port", sl.Err(err))
+		return
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Error("Failed to convert port string to integer", sl.Err(err))
+		return
+	}
+
+	endpoint := nodestorage.Endpoint{
+		NodeID:   nodeID,
+		Address:  address,
+		Port:     port,
+		Protocol: nodestorage.ProtocolTCP,
+		Source:   nodestorage.SourceLocal,
+	}
+
+	node, err := m.node_storage.GetNode(m.ctx, nodeID)
+	if err == nodestorage.ErrNodeNotFound {
+		log.Debug("Node not fount, creating new one", sl.Err(err))
+		log.Debug("New peer discovered",
+			slog.String("address", address),
+			slog.String("public_key", hex.EncodeToString(publicKey)),
+		)
+
+		newNode := nodestorage.Node{
+			ID:        nodeID,
+			PublicKey: publicKey,
+			Name:      string(publicKey),
+			FirstSeen: time.Now(),
+			LastSeen:  time.Now(),
+			Endpoints: []nodestorage.Endpoint{endpoint},
+		}
+
+		if err := m.node_storage.SaveNode(m.ctx, newNode); err != nil {
+			log.Error("Failed to save new node", sl.Err(err))
+			return
+		}
+
+		// TODO: plug
+		if m.config.AutoconnectEnabled {
+			go m.attemptPeerConnection(address)
+		}
+		return
+
+	} else if err != nil {
+		log.Error("Error getting node", sl.Err(err))
+		return
+	}
+
+	for _, endpoint := range node.Endpoints {
+		if endpoint.Address == address {
+			log.Debug("Endpoint already exists", slog.String("address", address))
 			return
 		}
 	}
 
-	// проверка существования пира
-	// _, exists := m.node.Peers.Get(string(publicKey))
-	// if exists {
-	// 	return
-	// }
-
-	// логирование обнаруженного пира
-	log.Info("New peer discovered",
-		slog.String("address", address),
-		slog.String("public_key", hex.EncodeToString(publicKey)),
-	)
-
-	_, port, err := net.SplitHostPort(address)
-	if err != nil {
-		log.Error("failed to Split Host Port", sl.Err(err))
+	if err := m.node_storage.AddEndpoint(m.ctx, node.ID, endpoint); err != nil {
+		log.Error("Failed to add new endpoint", sl.Err(err))
 		return
 	}
-	strPort, err := strconv.Atoi(port)
-	if err != nil {
-		log.Error("failed to convert string port to int port", sl.Err(err))
-		return
-	}
-
-	newNode := nodestorage.Node{
-		ID:        hex.EncodeToString(hashPublicKey[:]),
-		PublicKey: publicKey,
-		Name:      string(publicKey),
-		FirstSeen: time.Now(),
-		LastSeen:  time.Now(),
-		Endpoints: []nodestorage.Endpoint{
-			{
-				NodeID:   hex.EncodeToString(hashPublicKey[:]),
-				Address:  address,
-				Port:     strPort,
-				Protocol: nodestorage.ProtocolTCP,
-				Source:   nodestorage.SourceLocal,
-			},
-		},
-	}
-	m.node_storage.SaveNode(m.ctx, newNode)
+	log.Debug("Added new endpoint to existing node",
+		slog.String("node_id", nodeID),
+		slog.String("address", address))
 
 	// добавление в список обнаруженных пиров
 	// m.discoveredPeers.Store(address, publicKey)
 
-	// опциональная автоматическая попытка подключения
-	if m.config.AutoconnectEnabled {
-		go m.attemptPeerConnection(address)
-	}
 }
 
 // startPeriodicPeerValidation запускает периодическую проверку пиров
