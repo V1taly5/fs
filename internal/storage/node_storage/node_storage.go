@@ -520,6 +520,54 @@ func (s *NodeStorage) DeleteNode(ctx context.Context, nodeID string) error {
 	return nil
 }
 
+// AddEndpoint adds a new endpoint to a node if it doesn't already exist
+func (s *NodeStorage) AddEndpoint(ctx context.Context, nodeID string, newEndpoint Endpoint) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%w: failed to begin transaction: %v", ErrDBOperationFailed, err)
+	}
+	defer tx.Rollback()
+
+	// check if the endpoint already exists for the given node
+	var exists bool
+	err = tx.QueryRowContext(ctx,
+		`SELECT EXISTS(
+            SELECT 1 FROM endpoints
+            WHERE node_id = ? AND address = ? AND port = ? AND protocol = ?
+        )`, nodeID, newEndpoint.Address, newEndpoint.Port, newEndpoint.Protocol).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("%w: failed to check endpoint existence: %v", ErrDBOperationFailed, err)
+	}
+
+	if exists {
+		s.logger.Info("Endpoint already exists", "node_id", nodeID, "address", newEndpoint.Address, "port", newEndpoint.Port)
+		return nil
+	}
+
+	// insert the new endpoint
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO endpoints (
+            node_id, address, port, protocol, source,
+            last_success, success_count, failure_count, priority
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		nodeID, newEndpoint.Address, newEndpoint.Port, newEndpoint.Protocol, newEndpoint.Source,
+		nullableTime(newEndpoint.LastSuccess), newEndpoint.SuccessCount, newEndpoint.FailureCount, newEndpoint.Priority,
+	)
+	if err != nil {
+		return fmt.Errorf("%w: failed to insert endpoint: %v", ErrDBOperationFailed, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%w: failed to commit transaction: %v", ErrDBOperationFailed, err)
+	}
+
+	s.logger.Info("Added new endpoint", "node_id", nodeID, "address", newEndpoint.Address, "port", newEndpoint.Port)
+	return nil
+}
+
 // UpdateEndpoint updates or adds an endpoint for a node
 func (s *NodeStorage) UpdateEndpoint(ctx context.Context, endpoint Endpoint) error {
 	s.mu.Lock()
