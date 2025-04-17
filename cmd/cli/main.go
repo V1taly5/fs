@@ -6,9 +6,10 @@ import (
 )
 
 func main() {
+
 	CLI := cli.NewCLI()
 	CLI.RegisterPlugin(&cli.GreetCommand{})
-	if err := CLI.Run(); err != nil {
+	if err := CLI.RunCLI(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 }

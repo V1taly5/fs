@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -29,7 +30,12 @@ func (g *GreetCommand) Meta() *cobra.Command {
 	return g.cmd
 }
 
-func (g *GreetCommand) Execute(cmd *cobra.Command, args []string) error {
+func (g *GreetCommand) Execute(ctx context.Context, cmd *cobra.Command, args []string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 	name, err := cmd.Flags().GetString("name")
 	if err != nil || name == "" {
 		return fmt.Errorf("flag --name is required")

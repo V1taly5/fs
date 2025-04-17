@@ -51,12 +51,13 @@ type Connection interface {
 	StartReading(context.Context)
 	SendMessage(context.Context, *fsv1.Message) error
 	MessageChannel() <-chan *fsv1.Message
+	SetSessionKeys(clientKey, serverKey []byte) error
 }
 
 // Connector определяет интерфейс для различных типов соединений
 type Connector interface {
 	// connect устанавливает соединение с заданным endpoint
-	Connect(ctx context.Context, endpoints nodestorage.Endpoint) (Connection, error)
+	Connect(ctx context.Context, endpoints nodestorage.Endpoint, pubKey []byte) (Connection, error)
 	// suportProtocol проверяет, проддерживает ли данный протокол
 	SuportProtocol(protocol string) bool
 	Name() string

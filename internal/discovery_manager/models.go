@@ -28,4 +28,5 @@ type NodeDB interface {
 	GetNode(context.Context, string) (nodestorage.Node, error)
 	ListNodes(context.Context, nodestorage.NodeFilter) ([]nodestorage.Node, error)
 	DeleteEndpoint(ctx context.Context, endpointID int64) error
+	AddEndpoint(ctx context.Context, nodeID string, newEndpoint nodestorage.Endpoint) error
 }

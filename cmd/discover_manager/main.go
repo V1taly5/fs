@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,6 +12,7 @@ import (
 
 	"log/slog"
 
+	cliplugins "fs/internal/cli_plugins"
 	"fs/internal/config"
 	connectionmanager "fs/internal/connection_manager"
 	discoverymanager "fs/internal/discovery_manager"
@@ -17,6 +21,7 @@ import (
 	nodestorage "fs/internal/storage/node_storage"
 	"fs/internal/util/logger/handlers/slogpretty"
 	"fs/internal/util/logger/sl"
+	"fs/pkg/cli"
 )
 
 const (
@@ -26,11 +31,16 @@ const (
 )
 
 func main() {
+	file, err := os.OpenFile("log/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	defer file.Close()
 	// Загружаем конфигурацию
 	cfg := config.MustLoad()
 
 	// Настраиваем логгер
-	log := setupLogger(cfg.Env)
+	log := setupLogger(cfg.Env, file)
 
 	log.Info("starting application",
 		slog.String("name", cfg.Name),
@@ -84,7 +94,7 @@ func main() {
 		MaxRetryCount:     5,
 	}
 
-	connectionManager := connectionmanager.NewConnectionManager(ctx, n, storage, connectionConfig, log)
+	connectionManager := connectionmanager.NewConnectionManager(ctx, n, storage, connectionConfig, log, cfg.Port)
 
 	time.Sleep(9 * time.Second)
 
@@ -94,6 +104,14 @@ func main() {
 		InitialDelay:   time.Second,
 		MaxDelay:       time.Second * 10,
 	}
+	CLI := cli.NewCLI(ctx)
+	connCmd := cliplugins.NewConnectionCommand(connectionManager)
+	CLI.RegisterPlugin(&cli.GreetCommand{})
+	CLI.RegisterPlugin(connCmd)
+	if err := CLI.RunCLI(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+
 	node, err := storage.GetNode(ctx, "d9c8327530a1527c5eb755f0c92bfa693012b8f7a7737594f92f647e4dd28427")
 	if err != nil {
 		log.Error("failed to get node for ID", sl.Err(err))
@@ -120,13 +138,13 @@ func main() {
 	log.Info("Application shutdown complete")
 }
 
-func setupLogger(env string) *slog.Logger {
+func setupLogger(env string, writer io.Writer) *slog.Logger {
 
 	var log *slog.Logger
 
 	switch env {
 	case envLocal:
-		log = setupPrettySlog()
+		log = setupPrettySlog(writer)
 	case envDev:
 		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	case envProd:
@@ -135,14 +153,14 @@ func setupLogger(env string) *slog.Logger {
 	return log
 }
 
-func setupPrettySlog() *slog.Logger {
+func setupPrettySlog(writer io.Writer) *slog.Logger {
 	opts := slogpretty.PrettyHandlerOptions{
 		SlogOpts: &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		},
 	}
 
-	handler := opts.NewPrettyHandler(os.Stdout)
+	handler := opts.NewPrettyHandler(writer)
 
 	return slog.New(handler)
 }

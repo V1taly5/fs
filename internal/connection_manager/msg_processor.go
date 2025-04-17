@@ -2,11 +2,13 @@ package connectionmanager
 
 import (
 	"context"
+	"fmt"
 	"fs/internal/node"
 	fsv1 "fs/proto/gen/go"
 	"log/slog"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const DefaultMessageProcessTimeout = 30 * time.Second
@@ -26,13 +28,15 @@ type MessageProcessor struct {
 func NewMessageProcessor(ctx context.Context, node *node.Node, log *slog.Logger) *MessageProcessor {
 	ctx, cancel := context.WithCancel(ctx)
 
-	return &MessageProcessor{
+	mp := &MessageProcessor{
 		node:     node,
 		log:      log.With(slog.String("component", "message_processor")),
 		handlers: make(map[string]MsgHandler),
 		ctx:      ctx,
 		cancel:   cancel,
 	}
+
+	return mp
 }
 
 func (mp *MessageProcessor) RegisterHandler(msgType string, handler MsgHandler) {
@@ -114,4 +118,48 @@ func (mp *MessageProcessor) Stop() {
 	mp.cancel()
 	mp.processDone.Wait()
 	mp.log.Info("Message processor stopped")
+}
+
+func handlePing(ctx context.Context, conn Connection, msg *fsv1.Message) error {
+	// Deserialize the incoming PingMSG
+	ping := msg.GetPing()
+	nodeID := msg.GetSenderId()
+	fmt.Println("Пришло новое сообщение")
+	// Prepare the PongMSG with the same sequence number
+	pongMSG := &fsv1.Message{
+		MassageId:  generateMessageID(),
+		Timestamp:  uint64(time.Now().UnixNano()),
+		SenderId:   "d0827ff980b5ae539ba0a9e70892f1a7aa83ba9a26a16a0102de0e4f4c791888",
+		ReceiverId: nodeID,
+		Payload: &fsv1.Message_Pong{
+			Pong: &fsv1.PongMSG{
+				SeqNum:        ping.SeqNum,
+				RoundTripTime: 0,
+			},
+		},
+	}
+
+	if err := validateUTF8Fields(pongMSG); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	if err := conn.SendMessage(ctx, pongMSG); err != nil {
+		return fmt.Errorf("failed to send PongMSG: %w", err)
+	}
+
+	return nil
+}
+
+func generateMessageID() uint64 {
+	return uint64(time.Now().UnixNano())
+}
+
+func validateUTF8Fields(msg *fsv1.Message) error {
+	if !utf8.ValidString(msg.SenderId) {
+		return fmt.Errorf("invalid UTF-8 in SenderId")
+	}
+	if !utf8.ValidString(msg.ReceiverId) {
+		return fmt.Errorf("invalid UTF-8 in ReceiverId")
+	}
+	return nil
 }
