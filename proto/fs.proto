@@ -13,7 +13,7 @@ message Message {
 		Handshake handshake = 10;
 		PingMSG ping = 11;
 		PongMSG pong = 12;
-      IndexUpdate index_update = 13;
+      	IndexUpdate index_update = 13;
 		PeerStatus peer_status = 14;
 		BlockRequest block_request = 15;
 		BlockResponse block_response = 16;
@@ -58,22 +58,18 @@ message IndexUpdate {
 	uint64 sequence = 3;
 }
 
-message FileInfo {
-	string path = 1;
-	uint64 size = 2;
-	uint64 modified_time = 3;
-	string mode = 4;
-	bool is_directory = 5;
-	bytes file_id = 6;
-	repeated BlockInfo blocks = 7;
-	map<string, string> attributes = 8;
+message BlockInfo {
+    uint32 index = 1;
+    bytes hash = 2;
 }
 
-message BlockInfo {
-	uint32 index = 1;
-	uint32 sizy = 2;
-	bytes hash = 3;
-	bytes rolling_hash = 4;
+message FileInfo {
+    string path = 1;
+    uint64 size = 2;
+    uint64 modified_time = 3;
+    bytes file_hash = 4;
+    repeated BlockInfo blocks = 5;
+    bool deleted = 6;
 }
 
 message BlockRequest {
@@ -90,6 +86,7 @@ message Block {
 	uint32 index = 1;
 	bytes data = 2;
 	bytes hash = 3;
+	
 }
 
 message PullRequest {
