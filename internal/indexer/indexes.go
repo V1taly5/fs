@@ -92,6 +92,34 @@ func (i *Indexer) IndexFile(path string) error {
 	return nil
 }
 
+// TODO: implement gradual deletion of deleted data blocks
+func (i *Indexer) RemoveFileIndex(path string) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	_, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	fi, err := i.indexDB.GetFileIndex(path)
+	if err != nil {
+		if errors.Is(err, ErrFileIndexNotFound) {
+			return nil // file already not indexed
+		}
+		return fmt.Errorf("failed to get file index: %w", err)
+	}
+
+	fi.Deleted = true
+	fi.ModTime = time.Now()
+
+	if err := i.indexDB.UpdateFileIndex(fi); err != nil {
+		return fmt.Errorf("failed to update file index: %w", err)
+	}
+	i.logger.Printf("Marked file as deleted: %s", path)
+	return nil
+}
+
 func (i *Indexer) createNewVersion(fileHash [32]byte, blocks []BlockHash) FileVersion {
 	return FileVersion{
 		VersionID: uuid.New().String(),
@@ -449,4 +477,14 @@ func (i *Indexer) IndexDirectory(path string) error {
 
 		return nil
 	})
+}
+
+// TODO: normalize
+func (i *Indexer) GetAllFileIndexes() ([]*FileIndex, error) {
+	fileIndexes, err := i.indexDB.GetAllFileIndexes()
+	if err != nil {
+		return nil, err
+	}
+
+	return fileIndexes, nil
 }

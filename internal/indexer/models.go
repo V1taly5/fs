@@ -10,6 +10,7 @@ type FileIndex struct {
 	FileHash            [32]byte
 	Versions            []FileVersion
 	LastSyncedVersionID string
+	Deleted             bool
 }
 
 type FileVersion struct {
