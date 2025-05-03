@@ -23,6 +23,7 @@ func init() {
 type Indexer struct {
 	indexDB      IndexDatabase
 	blockStorage BlockStorage
+	rootDir      string
 	hasher       FileHasher
 	logger       *log.Logger
 	mu           sync.RWMutex
@@ -31,6 +32,7 @@ type Indexer struct {
 type IndexerConfig struct {
 	Database     IndexDatabase
 	BlockStorage BlockStorage
+	RootDir      string
 	Hasher       FileHasher
 	Logger       *log.Logger
 }
@@ -43,6 +45,7 @@ func NewIndexer(cfg IndexerConfig) *Indexer {
 	return &Indexer{
 		indexDB:      cfg.Database,
 		blockStorage: cfg.BlockStorage,
+		rootDir:      cfg.RootDir,
 		hasher:       cfg.Hasher,
 		logger:       cfg.Logger,
 	}
@@ -234,8 +237,20 @@ func (i *Indexer) findVersion(fi *FileIndex, versionID string) (*FileVersion, er
 	return nil, ErrVersionNotFound
 }
 
+// path this is the path where the file is saved on another node (absolute path)
+// based on it and the root directory, we determine where to save the file
 func (i *Indexer) RestoreFileFromBlocks(path string, blocks []BlockHash) error {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	fullPath, err := i.mapToLocalPath(path)
+	if err != nil {
+		return fmt.Errorf("failed to map ex path to local path: %w", err)
+	}
+
+	dir := filepath.Dir(fullPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directories: %w", err)
+	}
+
+	file, err := os.OpenFile(fullPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -254,9 +269,42 @@ func (i *Indexer) RestoreFileFromBlocks(path string, blocks []BlockHash) error {
 
 	return nil
 }
+func (i *Indexer) mapToLocalPath(path string) (string, error) {
+	// приводим путь к абсолютному виду
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("не удалось получить абсолютный путь: %w", err)
+	}
+
+	// разделяем путь на компоненты
+	parts := strings.Split(filepath.ToSlash(absPath), "/")
+
+	// извлекаем имя общей корневой директории из RootDir
+	commonRoot := filepath.Base(filepath.ToSlash(i.rootDir))
+
+	// ищем индекс общей корневой директории
+	var idx int = -1
+	for j, part := range parts {
+		if part == commonRoot {
+			idx = j
+			break
+		}
+	}
+	if idx == -1 {
+		return "", fmt.Errorf("общая корневая директория %q не найдена в пути %q", commonRoot, absPath)
+	}
+
+	// строим относительный путь от общей корневой директории до целевого файла
+	relParts := parts[idx+1:]
+	relPath := filepath.Join(relParts...)
+
+	fullPath := filepath.Join(i.rootDir, relPath)
+
+	return fullPath, nil
+}
 
 func (i *Indexer) UpdateFileIndexAfterBlockWrite(filePath string, blockIndex int, blockHash [32]byte) error {
-	// Get initial index with read lock
+	// get initial index with read lock
 	i.mu.RLock()
 	fi, err := i.indexDB.GetFileIndex(filePath)
 	i.mu.RUnlock()
@@ -273,7 +321,7 @@ func (i *Indexer) UpdateFileIndexAfterBlockWrite(filePath string, blockIndex int
 		copy(blocks, fi.Blocks)
 	}
 
-	// Update block in memory
+	// update block in memory
 	updated := false
 	for idx := range blocks {
 		if blocks[idx].Index == blockIndex {
