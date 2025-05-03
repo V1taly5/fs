@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"fs/internal/node"
 	nodestorage "fs/internal/storage/node_storage"
@@ -20,6 +21,19 @@ import (
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
 )
+
+// GetActiveConnection возвращает активное соединение по указанному ключу.
+func (cm *ConnectionManager) GetActiveConnection(key string) (Connection, bool) {
+	value, exists := cm.activeConns.Load(key)
+	if !exists {
+		return nil, false
+	}
+	conn, ok := value.(Connection)
+	if !ok {
+		return nil, false
+	}
+	return conn, true
+}
 
 func NewConnectionManager(
 	ctx context.Context,
@@ -46,7 +60,11 @@ func NewConnectionManager(
 	}
 
 	manager.msgProcessor = NewMessageProcessor(ctx, node, log)
-	manager.RegisterMessageHandler("ping", handlePing)
+	manager.msgProcessor.RegisterDefaultHandlers()
+	// manager.RegisterMessageHandler("ping", handlePing)
+	// manager.RegisterMessageHandler("indexes", manager.msgProcessor.HandleIndexes)
+	// manager.RegisterMessageHandler("BREQ", manager.msgProcessor.HandleBlockRequest)
+	// manager.RegisterMessageHandler("BRES", manager.msgProcessor.HandleBlockResponse)
 	service := fmt.Sprintf("0.0.0.0:%v", port)
 	manager.StartTCPListenrer(ctx, service)
 
@@ -207,7 +225,7 @@ func (m *ConnectionManager) GetActiveConnectionForNode(nodeID string) (Connectio
 }
 
 // GetActiveConnection возвращает slice всех активных соединений
-func (m *ConnectionManager) GetActiveConnection() []Connection {
+func (m *ConnectionManager) GetActiveConnections() []Connection {
 	connections := []Connection{}
 
 	m.activeConns.Range(func(key, value interface{}) bool {
@@ -299,7 +317,7 @@ func (m *ConnectionManager) StartMessageProcessing() {
 	}
 
 	// starting processing for all active connections
-	connections := m.GetActiveConnection()
+	connections := m.GetActiveConnections()
 	for _, conn := range connections {
 		m.StartProcessingForConnection(conn)
 	}
@@ -519,6 +537,7 @@ func (c *ConnectionManager) handleIncomingTCPConnection(ctx context.Context, con
 		conn.Close()
 		return
 	}
+
 	connInstance.SetSessionKeys(serverKey, clientKey)
 
 	// Добавляем активное соединение в мапу
@@ -540,8 +559,12 @@ func (c *ConnectionManager) NewTCPConnectionFromIncoming(conn net.Conn, remotePu
 	}
 
 	// Формирование структуры Endpoint. Поле NodeID заполним позже, после handshake.
+
+	nodeID := sha256.Sum256(remotePubKey)
+	stringNodeID := hex.EncodeToString(nodeID[:])
+
 	endpoint := nodestorage.Endpoint{
-		NodeID:   string(remotePubKey),
+		NodeID:   stringNodeID,
 		Address:  remoteAddr,
 		Port:     port,
 		Protocol: nodestorage.ProtocolTCP,
@@ -552,5 +575,9 @@ func (c *ConnectionManager) NewTCPConnectionFromIncoming(conn net.Conn, remotePu
 
 	// Создаём TCPConnection с использованием фабричного метода.
 	tcpConn := NewTCPConnection(conn, endpoint)
+
+	c.db.UpdateEndpointStats(context.TODO(), endpoint.ID, true)
+	c.activeConns.Store(endpoint.NodeID, tcpConn)
+
 	return tcpConn, nil
 }
