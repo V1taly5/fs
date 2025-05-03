@@ -51,7 +51,7 @@ func (r *MessageRouter) SendIndexUpdate(
 	sequence uint64,
 ) error {
 
-	hashPubKey := sha256.Sum224(r.node.PubKey)
+	hashPubKey := sha256.Sum256(r.node.PubKey)
 	nodeId := hex.EncodeToString(hashPubKey[:])
 
 	files, err := r.indexer.GetAllFileIndexes()
@@ -70,57 +70,6 @@ func (r *MessageRouter) SendIndexUpdate(
 				Files:        fsv1Files,
 				IsFullUpdate: isFullUpdate,
 				Sequence:     sequence,
-			},
-		},
-	}
-
-	return r.sendMessage(ctx, nodeID, msg)
-}
-
-// Сейчас реализация отличается от прошлой, запрашивается
-// информация об одном файле за одни раз (надо изменить обработчик)
-func (r *MessageRouter) SendRequestMissingBlock(
-	ctx context.Context,
-	nodeID string,
-	filePath string,
-	blockIndexes []uint32,
-) error {
-	hashPubKey := sha256.Sum224(r.node.PubKey)
-	nodeId := hex.EncodeToString(hashPubKey[:])
-	msg := &fsv1.Message{
-		MassageId:  generateMessageID(),
-		Timestamp:  uint64(time.Now().UnixNano()),
-		SenderId:   nodeId,
-		ReceiverId: nodeID,
-		Payload: &fsv1.Message_BlockRequest{
-			BlockRequest: &fsv1.BlockRequest{
-				FileId:       filePath,
-				BlockIndexes: blockIndexes,
-			},
-		},
-	}
-
-	return r.sendMessage(ctx, nodeID, msg)
-}
-
-func (r *MessageRouter) SendResponseBlock(
-	ctx context.Context,
-	nodeID string,
-	filePath string,
-	blocks []*indexer.BlockHash,
-) error {
-	fsv1Blocks := ConvertToProtoBlocks(blocks)
-	hashPubKey := sha256.Sum224(r.node.PubKey)
-	nodeId := hex.EncodeToString(hashPubKey[:])
-	msg := &fsv1.Message{
-		MassageId:  generateMessageID(),
-		Timestamp:  uint64(time.Now().UnixNano()),
-		SenderId:   nodeId,
-		ReceiverId: nodeID,
-		Payload: &fsv1.Message_BlockResponse{
-			BlockResponse: &fsv1.BlockResponse{
-				FileId: filePath,
-				Blocks: fsv1Blocks,
 			},
 		},
 	}
