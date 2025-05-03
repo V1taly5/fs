@@ -70,7 +70,7 @@ func (x PeerStatus_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PeerStatus_Status.Descriptor instead.
 func (PeerStatus_Status) EnumDescriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{4, 0}
+	return file_fs_proto_rawDescGZIP(), []int{6, 0}
 }
 
 type ErrorMessage_ErrorCode int32
@@ -137,7 +137,7 @@ func (x ErrorMessage_ErrorCode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ErrorMessage_ErrorCode.Descriptor instead.
 func (ErrorMessage_ErrorCode) EnumDescriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{13, 0}
+	return file_fs_proto_rawDescGZIP(), []int{14, 0}
 }
 
 type Message struct {
@@ -382,6 +382,102 @@ func (*Message_PushRequest) isMessage_Payload() {}
 
 func (*Message_Error) isMessage_Payload() {}
 
+type BlockRequestList struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlockRequests []*BlockRequest        `protobuf:"bytes,1,rep,name=block_requests,json=blockRequests,proto3" json:"block_requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockRequestList) Reset() {
+	*x = BlockRequestList{}
+	mi := &file_fs_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockRequestList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockRequestList) ProtoMessage() {}
+
+func (x *BlockRequestList) ProtoReflect() protoreflect.Message {
+	mi := &file_fs_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockRequestList.ProtoReflect.Descriptor instead.
+func (*BlockRequestList) Descriptor() ([]byte, []int) {
+	return file_fs_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *BlockRequestList) GetBlockRequests() []*BlockRequest {
+	if x != nil {
+		return x.BlockRequests
+	}
+	return nil
+}
+
+type BlockRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	BlockIndexes  uint32                 `protobuf:"varint,2,opt,name=block_indexes,json=blockIndexes,proto3" json:"block_indexes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockRequest) Reset() {
+	*x = BlockRequest{}
+	mi := &file_fs_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockRequest) ProtoMessage() {}
+
+func (x *BlockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_fs_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockRequest.ProtoReflect.Descriptor instead.
+func (*BlockRequest) Descriptor() ([]byte, []int) {
+	return file_fs_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *BlockRequest) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *BlockRequest) GetBlockIndexes() uint32 {
+	if x != nil {
+		return x.BlockIndexes
+	}
+	return 0
+}
+
 type Handshake struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	ProtocolVersion string                 `protobuf:"bytes,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
@@ -394,7 +490,7 @@ type Handshake struct {
 
 func (x *Handshake) Reset() {
 	*x = Handshake{}
-	mi := &file_fs_proto_msgTypes[1]
+	mi := &file_fs_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +502,7 @@ func (x *Handshake) String() string {
 func (*Handshake) ProtoMessage() {}
 
 func (x *Handshake) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[1]
+	mi := &file_fs_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -419,7 +515,7 @@ func (x *Handshake) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Handshake.ProtoReflect.Descriptor instead.
 func (*Handshake) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{1}
+	return file_fs_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Handshake) GetProtocolVersion() string {
@@ -459,7 +555,7 @@ type PingMSG struct {
 
 func (x *PingMSG) Reset() {
 	*x = PingMSG{}
-	mi := &file_fs_proto_msgTypes[2]
+	mi := &file_fs_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -471,7 +567,7 @@ func (x *PingMSG) String() string {
 func (*PingMSG) ProtoMessage() {}
 
 func (x *PingMSG) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[2]
+	mi := &file_fs_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -484,7 +580,7 @@ func (x *PingMSG) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingMSG.ProtoReflect.Descriptor instead.
 func (*PingMSG) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{2}
+	return file_fs_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PingMSG) GetSeqNum() uint64 {
@@ -504,7 +600,7 @@ type PongMSG struct {
 
 func (x *PongMSG) Reset() {
 	*x = PongMSG{}
-	mi := &file_fs_proto_msgTypes[3]
+	mi := &file_fs_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -516,7 +612,7 @@ func (x *PongMSG) String() string {
 func (*PongMSG) ProtoMessage() {}
 
 func (x *PongMSG) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[3]
+	mi := &file_fs_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -529,7 +625,7 @@ func (x *PongMSG) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PongMSG.ProtoReflect.Descriptor instead.
 func (*PongMSG) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{3}
+	return file_fs_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PongMSG) GetSeqNum() uint64 {
@@ -558,7 +654,7 @@ type PeerStatus struct {
 
 func (x *PeerStatus) Reset() {
 	*x = PeerStatus{}
-	mi := &file_fs_proto_msgTypes[4]
+	mi := &file_fs_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +666,7 @@ func (x *PeerStatus) String() string {
 func (*PeerStatus) ProtoMessage() {}
 
 func (x *PeerStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[4]
+	mi := &file_fs_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +679,7 @@ func (x *PeerStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PeerStatus.ProtoReflect.Descriptor instead.
 func (*PeerStatus) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{4}
+	return file_fs_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PeerStatus) GetStatus() PeerStatus_Status {
@@ -625,7 +721,7 @@ type IndexUpdate struct {
 
 func (x *IndexUpdate) Reset() {
 	*x = IndexUpdate{}
-	mi := &file_fs_proto_msgTypes[5]
+	mi := &file_fs_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -637,7 +733,7 @@ func (x *IndexUpdate) String() string {
 func (*IndexUpdate) ProtoMessage() {}
 
 func (x *IndexUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[5]
+	mi := &file_fs_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -650,7 +746,7 @@ func (x *IndexUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndexUpdate.ProtoReflect.Descriptor instead.
 func (*IndexUpdate) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{5}
+	return file_fs_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *IndexUpdate) GetFiles() []*FileInfo {
@@ -674,23 +770,73 @@ func (x *IndexUpdate) GetSequence() uint64 {
 	return 0
 }
 
+type BlockInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Index         uint32                 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	Hash          []byte                 `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockInfo) Reset() {
+	*x = BlockInfo{}
+	mi := &file_fs_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockInfo) ProtoMessage() {}
+
+func (x *BlockInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_fs_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockInfo.ProtoReflect.Descriptor instead.
+func (*BlockInfo) Descriptor() ([]byte, []int) {
+	return file_fs_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *BlockInfo) GetIndex() uint32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *BlockInfo) GetHash() []byte {
+	if x != nil {
+		return x.Hash
+	}
+	return nil
+}
+
 type FileInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	Size          uint64                 `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
 	ModifiedTime  uint64                 `protobuf:"varint,3,opt,name=modified_time,json=modifiedTime,proto3" json:"modified_time,omitempty"`
-	Mode          string                 `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`
-	IsDirectory   bool                   `protobuf:"varint,5,opt,name=is_directory,json=isDirectory,proto3" json:"is_directory,omitempty"`
-	FileId        []byte                 `protobuf:"bytes,6,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
-	Blocks        []*BlockInfo           `protobuf:"bytes,7,rep,name=blocks,proto3" json:"blocks,omitempty"`
-	Attributes    map[string]string      `protobuf:"bytes,8,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	FileHash      []byte                 `protobuf:"bytes,4,opt,name=file_hash,json=fileHash,proto3" json:"file_hash,omitempty"`
+	Blocks        []*BlockInfo           `protobuf:"bytes,5,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	Deleted       bool                   `protobuf:"varint,6,opt,name=deleted,proto3" json:"deleted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FileInfo) Reset() {
 	*x = FileInfo{}
-	mi := &file_fs_proto_msgTypes[6]
+	mi := &file_fs_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -702,7 +848,7 @@ func (x *FileInfo) String() string {
 func (*FileInfo) ProtoMessage() {}
 
 func (x *FileInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[6]
+	mi := &file_fs_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -715,7 +861,7 @@ func (x *FileInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileInfo.ProtoReflect.Descriptor instead.
 func (*FileInfo) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{6}
+	return file_fs_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *FileInfo) GetPath() string {
@@ -739,23 +885,9 @@ func (x *FileInfo) GetModifiedTime() uint64 {
 	return 0
 }
 
-func (x *FileInfo) GetMode() string {
+func (x *FileInfo) GetFileHash() []byte {
 	if x != nil {
-		return x.Mode
-	}
-	return ""
-}
-
-func (x *FileInfo) GetIsDirectory() bool {
-	if x != nil {
-		return x.IsDirectory
-	}
-	return false
-}
-
-func (x *FileInfo) GetFileId() []byte {
-	if x != nil {
-		return x.FileId
+		return x.FileHash
 	}
 	return nil
 }
@@ -767,144 +899,24 @@ func (x *FileInfo) GetBlocks() []*BlockInfo {
 	return nil
 }
 
-func (x *FileInfo) GetAttributes() map[string]string {
+func (x *FileInfo) GetDeleted() bool {
 	if x != nil {
-		return x.Attributes
+		return x.Deleted
 	}
-	return nil
-}
-
-type BlockInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Index         uint32                 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
-	Sizy          uint32                 `protobuf:"varint,2,opt,name=sizy,proto3" json:"sizy,omitempty"`
-	Hash          []byte                 `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
-	RollingHash   []byte                 `protobuf:"bytes,4,opt,name=rolling_hash,json=rollingHash,proto3" json:"rolling_hash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BlockInfo) Reset() {
-	*x = BlockInfo{}
-	mi := &file_fs_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BlockInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BlockInfo) ProtoMessage() {}
-
-func (x *BlockInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BlockInfo.ProtoReflect.Descriptor instead.
-func (*BlockInfo) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *BlockInfo) GetIndex() uint32 {
-	if x != nil {
-		return x.Index
-	}
-	return 0
-}
-
-func (x *BlockInfo) GetSizy() uint32 {
-	if x != nil {
-		return x.Sizy
-	}
-	return 0
-}
-
-func (x *BlockInfo) GetHash() []byte {
-	if x != nil {
-		return x.Hash
-	}
-	return nil
-}
-
-func (x *BlockInfo) GetRollingHash() []byte {
-	if x != nil {
-		return x.RollingHash
-	}
-	return nil
-}
-
-type BlockRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
-	BlockIndexes  []uint32               `protobuf:"varint,2,rep,packed,name=block_indexes,json=blockIndexes,proto3" json:"block_indexes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BlockRequest) Reset() {
-	*x = BlockRequest{}
-	mi := &file_fs_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BlockRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BlockRequest) ProtoMessage() {}
-
-func (x *BlockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BlockRequest.ProtoReflect.Descriptor instead.
-func (*BlockRequest) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *BlockRequest) GetFileId() string {
-	if x != nil {
-		return x.FileId
-	}
-	return ""
-}
-
-func (x *BlockRequest) GetBlockIndexes() []uint32 {
-	if x != nil {
-		return x.BlockIndexes
-	}
-	return nil
+	return false
 }
 
 type BlockResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
-	Blocks        []*Block               `protobuf:"bytes,2,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	Blocks        *Block                 `protobuf:"bytes,2,opt,name=blocks,proto3" json:"blocks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BlockResponse) Reset() {
 	*x = BlockResponse{}
-	mi := &file_fs_proto_msgTypes[9]
+	mi := &file_fs_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -916,7 +928,7 @@ func (x *BlockResponse) String() string {
 func (*BlockResponse) ProtoMessage() {}
 
 func (x *BlockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[9]
+	mi := &file_fs_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -929,7 +941,7 @@ func (x *BlockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockResponse.ProtoReflect.Descriptor instead.
 func (*BlockResponse) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{9}
+	return file_fs_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BlockResponse) GetFileId() string {
@@ -939,7 +951,7 @@ func (x *BlockResponse) GetFileId() string {
 	return ""
 }
 
-func (x *BlockResponse) GetBlocks() []*Block {
+func (x *BlockResponse) GetBlocks() *Block {
 	if x != nil {
 		return x.Blocks
 	}
@@ -957,7 +969,7 @@ type Block struct {
 
 func (x *Block) Reset() {
 	*x = Block{}
-	mi := &file_fs_proto_msgTypes[10]
+	mi := &file_fs_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -969,7 +981,7 @@ func (x *Block) String() string {
 func (*Block) ProtoMessage() {}
 
 func (x *Block) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[10]
+	mi := &file_fs_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -982,7 +994,7 @@ func (x *Block) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Block.ProtoReflect.Descriptor instead.
 func (*Block) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{10}
+	return file_fs_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Block) GetIndex() uint32 {
@@ -1017,7 +1029,7 @@ type PullRequest struct {
 
 func (x *PullRequest) Reset() {
 	*x = PullRequest{}
-	mi := &file_fs_proto_msgTypes[11]
+	mi := &file_fs_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1029,7 +1041,7 @@ func (x *PullRequest) String() string {
 func (*PullRequest) ProtoMessage() {}
 
 func (x *PullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[11]
+	mi := &file_fs_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1042,7 +1054,7 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{11}
+	return file_fs_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PullRequest) GetFileIds() []string {
@@ -1076,7 +1088,7 @@ type PushRequest struct {
 
 func (x *PushRequest) Reset() {
 	*x = PushRequest{}
-	mi := &file_fs_proto_msgTypes[12]
+	mi := &file_fs_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1088,7 +1100,7 @@ func (x *PushRequest) String() string {
 func (*PushRequest) ProtoMessage() {}
 
 func (x *PushRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[12]
+	mi := &file_fs_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1101,7 +1113,7 @@ func (x *PushRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PushRequest.ProtoReflect.Descriptor instead.
 func (*PushRequest) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{12}
+	return file_fs_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PushRequest) GetFileIds() []string {
@@ -1129,7 +1141,7 @@ type ErrorMessage struct {
 
 func (x *ErrorMessage) Reset() {
 	*x = ErrorMessage{}
-	mi := &file_fs_proto_msgTypes[13]
+	mi := &file_fs_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1141,7 +1153,7 @@ func (x *ErrorMessage) String() string {
 func (*ErrorMessage) ProtoMessage() {}
 
 func (x *ErrorMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_fs_proto_msgTypes[13]
+	mi := &file_fs_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1154,7 +1166,7 @@ func (x *ErrorMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorMessage.ProtoReflect.Descriptor instead.
 func (*ErrorMessage) Descriptor() ([]byte, []int) {
-	return file_fs_proto_rawDescGZIP(), []int{13}
+	return file_fs_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ErrorMessage) GetCode() ErrorMessage_ErrorCode {
@@ -1202,7 +1214,12 @@ const file_fs_proto_rawDesc = "" +
 	"\fpull_request\x18\x11 \x01(\v2\x12.cover.PullRequestH\x00R\vpullRequest\x127\n" +
 	"\fpush_request\x18\x12 \x01(\v2\x12.cover.PushRequestH\x00R\vpushRequest\x12+\n" +
 	"\x05error\x18\x13 \x01(\v2\x13.cover.ErrorMessageH\x00R\x05errorB\t\n" +
-	"\apayload\"\x9a\x01\n" +
+	"\apayload\"N\n" +
+	"\x10BlockRequestList\x12:\n" +
+	"\x0eblock_requests\x18\x01 \x03(\v2\x13.cover.BlockRequestR\rblockRequests\"L\n" +
+	"\fBlockRequest\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12#\n" +
+	"\rblock_indexes\x18\x02 \x01(\rR\fblockIndexes\"\x9a\x01\n" +
 	"\tHandshake\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\tR\x0fprotocolVersion\x12\x1f\n" +
 	"\vdevice_name\x18\x02 \x01(\tR\n" +
@@ -1230,32 +1247,20 @@ const file_fs_proto_rawDesc = "" +
 	"\vIndexUpdate\x12%\n" +
 	"\x05files\x18\x01 \x03(\v2\x0f.cover.FileInfoR\x05files\x12$\n" +
 	"\x0eis_full_update\x18\x02 \x01(\bR\fisFullUpdate\x12\x1a\n" +
-	"\bsequence\x18\x03 \x01(\x04R\bsequence\"\xd1\x02\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\"5\n" +
+	"\tBlockInfo\x12\x14\n" +
+	"\x05index\x18\x01 \x01(\rR\x05index\x12\x12\n" +
+	"\x04hash\x18\x02 \x01(\fR\x04hash\"\xb8\x01\n" +
 	"\bFileInfo\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x04R\x04size\x12#\n" +
-	"\rmodified_time\x18\x03 \x01(\x04R\fmodifiedTime\x12\x12\n" +
-	"\x04mode\x18\x04 \x01(\tR\x04mode\x12!\n" +
-	"\fis_directory\x18\x05 \x01(\bR\visDirectory\x12\x17\n" +
-	"\afile_id\x18\x06 \x01(\fR\x06fileId\x12(\n" +
-	"\x06blocks\x18\a \x03(\v2\x10.cover.BlockInfoR\x06blocks\x12?\n" +
-	"\n" +
-	"attributes\x18\b \x03(\v2\x1f.cover.FileInfo.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
-	"\x0fAttributesEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"l\n" +
-	"\tBlockInfo\x12\x14\n" +
-	"\x05index\x18\x01 \x01(\rR\x05index\x12\x12\n" +
-	"\x04sizy\x18\x02 \x01(\rR\x04sizy\x12\x12\n" +
-	"\x04hash\x18\x03 \x01(\fR\x04hash\x12!\n" +
-	"\frolling_hash\x18\x04 \x01(\fR\vrollingHash\"L\n" +
-	"\fBlockRequest\x12\x17\n" +
-	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12#\n" +
-	"\rblock_indexes\x18\x02 \x03(\rR\fblockIndexes\"N\n" +
+	"\rmodified_time\x18\x03 \x01(\x04R\fmodifiedTime\x12\x1b\n" +
+	"\tfile_hash\x18\x04 \x01(\fR\bfileHash\x12(\n" +
+	"\x06blocks\x18\x05 \x03(\v2\x10.cover.BlockInfoR\x06blocks\x12\x18\n" +
+	"\adeleted\x18\x06 \x01(\bR\adeleted\"N\n" +
 	"\rBlockResponse\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12$\n" +
-	"\x06blocks\x18\x02 \x03(\v2\f.cover.BlockR\x06blocks\"E\n" +
+	"\x06blocks\x18\x02 \x01(\v2\f.cover.BlockR\x06blocks\"E\n" +
 	"\x05Block\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\rR\x05index\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x12\x12\n" +
@@ -1302,37 +1307,37 @@ var file_fs_proto_goTypes = []any{
 	(PeerStatus_Status)(0),      // 0: cover.PeerStatus.Status
 	(ErrorMessage_ErrorCode)(0), // 1: cover.ErrorMessage.ErrorCode
 	(*Message)(nil),             // 2: cover.Message
-	(*Handshake)(nil),           // 3: cover.Handshake
-	(*PingMSG)(nil),             // 4: cover.PingMSG
-	(*PongMSG)(nil),             // 5: cover.PongMSG
-	(*PeerStatus)(nil),          // 6: cover.PeerStatus
-	(*IndexUpdate)(nil),         // 7: cover.IndexUpdate
-	(*FileInfo)(nil),            // 8: cover.FileInfo
-	(*BlockInfo)(nil),           // 9: cover.BlockInfo
-	(*BlockRequest)(nil),        // 10: cover.BlockRequest
-	(*BlockResponse)(nil),       // 11: cover.BlockResponse
-	(*Block)(nil),               // 12: cover.Block
-	(*PullRequest)(nil),         // 13: cover.PullRequest
-	(*PushRequest)(nil),         // 14: cover.PushRequest
-	(*ErrorMessage)(nil),        // 15: cover.ErrorMessage
-	nil,                         // 16: cover.FileInfo.AttributesEntry
+	(*BlockRequestList)(nil),    // 3: cover.BlockRequestList
+	(*BlockRequest)(nil),        // 4: cover.BlockRequest
+	(*Handshake)(nil),           // 5: cover.Handshake
+	(*PingMSG)(nil),             // 6: cover.PingMSG
+	(*PongMSG)(nil),             // 7: cover.PongMSG
+	(*PeerStatus)(nil),          // 8: cover.PeerStatus
+	(*IndexUpdate)(nil),         // 9: cover.IndexUpdate
+	(*BlockInfo)(nil),           // 10: cover.BlockInfo
+	(*FileInfo)(nil),            // 11: cover.FileInfo
+	(*BlockResponse)(nil),       // 12: cover.BlockResponse
+	(*Block)(nil),               // 13: cover.Block
+	(*PullRequest)(nil),         // 14: cover.PullRequest
+	(*PushRequest)(nil),         // 15: cover.PushRequest
+	(*ErrorMessage)(nil),        // 16: cover.ErrorMessage
 }
 var file_fs_proto_depIdxs = []int32{
-	3,  // 0: cover.Message.handshake:type_name -> cover.Handshake
-	4,  // 1: cover.Message.ping:type_name -> cover.PingMSG
-	5,  // 2: cover.Message.pong:type_name -> cover.PongMSG
-	7,  // 3: cover.Message.index_update:type_name -> cover.IndexUpdate
-	6,  // 4: cover.Message.peer_status:type_name -> cover.PeerStatus
-	10, // 5: cover.Message.block_request:type_name -> cover.BlockRequest
-	11, // 6: cover.Message.block_response:type_name -> cover.BlockResponse
-	13, // 7: cover.Message.pull_request:type_name -> cover.PullRequest
-	14, // 8: cover.Message.push_request:type_name -> cover.PushRequest
-	15, // 9: cover.Message.error:type_name -> cover.ErrorMessage
-	0,  // 10: cover.PeerStatus.status:type_name -> cover.PeerStatus.Status
-	8,  // 11: cover.IndexUpdate.files:type_name -> cover.FileInfo
-	9,  // 12: cover.FileInfo.blocks:type_name -> cover.BlockInfo
-	16, // 13: cover.FileInfo.attributes:type_name -> cover.FileInfo.AttributesEntry
-	12, // 14: cover.BlockResponse.blocks:type_name -> cover.Block
+	5,  // 0: cover.Message.handshake:type_name -> cover.Handshake
+	6,  // 1: cover.Message.ping:type_name -> cover.PingMSG
+	7,  // 2: cover.Message.pong:type_name -> cover.PongMSG
+	9,  // 3: cover.Message.index_update:type_name -> cover.IndexUpdate
+	8,  // 4: cover.Message.peer_status:type_name -> cover.PeerStatus
+	4,  // 5: cover.Message.block_request:type_name -> cover.BlockRequest
+	12, // 6: cover.Message.block_response:type_name -> cover.BlockResponse
+	14, // 7: cover.Message.pull_request:type_name -> cover.PullRequest
+	15, // 8: cover.Message.push_request:type_name -> cover.PushRequest
+	16, // 9: cover.Message.error:type_name -> cover.ErrorMessage
+	4,  // 10: cover.BlockRequestList.block_requests:type_name -> cover.BlockRequest
+	0,  // 11: cover.PeerStatus.status:type_name -> cover.PeerStatus.Status
+	11, // 12: cover.IndexUpdate.files:type_name -> cover.FileInfo
+	10, // 13: cover.FileInfo.blocks:type_name -> cover.BlockInfo
+	13, // 14: cover.BlockResponse.blocks:type_name -> cover.Block
 	1,  // 15: cover.ErrorMessage.code:type_name -> cover.ErrorMessage.ErrorCode
 	16, // [16:16] is the sub-list for method output_type
 	16, // [16:16] is the sub-list for method input_type

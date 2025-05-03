@@ -23,6 +23,16 @@ message Message {
 	}
 }
 
+message BlockRequestList {
+    repeated BlockRequest block_requests = 1;
+} 
+
+
+message BlockRequest {
+	string file_id = 1;
+	uint32 block_indexes = 2;
+}
+
 message Handshake {
 	string protocol_version = 1;
 	string device_name = 2;
@@ -72,14 +82,10 @@ message FileInfo {
     bool deleted = 6;
 }
 
-message BlockRequest {
-	string file_id = 1;
-	repeated uint32 block_indexes = 2;
-}
 
 message BlockResponse {
 	string file_id = 1;
-	repeated Block blocks = 2;
+	Block blocks = 2;
 }
 
 message Block {
