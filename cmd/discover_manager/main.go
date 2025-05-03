@@ -17,10 +17,12 @@ import (
 	connectionmanager "fs/internal/connection_manager"
 	discoverymanager "fs/internal/discovery_manager"
 	discoverymodels "fs/internal/discovery_manager/models"
+	messagerouter "fs/internal/message_router"
 	"fs/internal/node"
 	nodestorage "fs/internal/storage/node_storage"
 	"fs/internal/util/logger/handlers/slogpretty"
 	"fs/internal/util/logger/sl"
+	"fs/internal/watcher"
 	"fs/pkg/cli"
 )
 
@@ -64,6 +66,31 @@ func main() {
 	// Создаем узел
 	n := node.NewNode(cfg.Name, cfg.Port, log)
 
+	watcherConfig := watcher.Config{
+		DebounceDuration: 500 * time.Millisecond,
+		IgnorePatterns:   []string{":Zone.Identifier", ".tmp", "~", ".swp", ".swo", ".swx", "#", "#", "/tmp/"},
+		Logger:           nil,
+	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	watchPath := dir + "/testFolder"
+	fmt.Println(watchPath)
+
+	watcher, err := watcher.NewFileWatcher(n.Indexer, watcherConfig)
+	if err != nil {
+		return
+	}
+
+	err = watcher.Watch(watchPath)
+	if err != nil {
+		return
+	}
+	n.Watcher = watcher
+
 	// Конфигурация для обнаружения пиров
 	discoveryConfig := &discoverymodels.PeerDiscoveryConfig{
 		MulticastAddress:   "239.0.0.1:9999", // Пример multicast-адреса
@@ -92,11 +119,17 @@ func main() {
 		BaseRetryInterval: time.Second * 1,
 		MaxRetryInterval:  time.Second * 60,
 		MaxRetryCount:     5,
+		AutoStartProcess:  true,
 	}
 
 	connectionManager := connectionmanager.NewConnectionManager(ctx, n, storage, connectionConfig, log, cfg.Port)
 
 	time.Sleep(9 * time.Second)
+
+	message_router := messagerouter.NewMessageRouter(n, n.Indexer, connectionManager, log)
+
+	// handler := handlers.NewHadler(connectionManager, n, log)
+	// handler.RegisterStandardHandlers()
 
 	retryOptions := &connectionmanager.RetryOptions{
 		MaxAttempts:    3,
@@ -106,7 +139,9 @@ func main() {
 	}
 	CLI := cli.NewCLI(ctx)
 	connCmd := cliplugins.NewConnectionCommand(connectionManager)
+	sendCmd := cliplugins.NewSenderCommand(message_router)
 	CLI.RegisterPlugin(&cli.GreetCommand{})
+	CLI.RegisterPlugin(sendCmd)
 	CLI.RegisterPlugin(connCmd)
 	if err := CLI.RunCLI(); err != nil {
 		fmt.Printf("Error: %v\n", err)
