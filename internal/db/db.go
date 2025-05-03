@@ -161,3 +161,24 @@ func (idb *IndexDB) DeleteFileIndex(path string) error {
 		return bucket.Delete([]byte(path))
 	})
 }
+
+// PrintAllFileIndexes выводит все ключи и значения из bucket FileIndexesBucket
+func (idb *IndexDB) PrintAllFileIndexes() error {
+	return idb.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket([]byte(FileIndexesBucket))
+		if bucket == nil {
+			return fmt.Errorf("bucket %q не найден", FileIndexesBucket)
+		}
+
+		cursor := bucket.Cursor()
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			var fi indexer.FileIndex
+			if err := idb.serializer.Deserialize(v, &fi); err != nil {
+				fmt.Printf("Ошибка десериализации для ключа %s: %v\n", k, err)
+				continue
+			}
+			fmt.Printf("Ключ: %s, Значение: %+v\n", k, fi)
+		}
+		return nil
+	})
+}
